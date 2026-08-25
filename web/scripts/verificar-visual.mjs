@@ -118,9 +118,15 @@ async function recorrer(nombre, viewport) {
     await pagina.getByText("Intención de la sesión").waitFor({ timeout: 5000 });
     await pagina.fill('input[name="intencion"]', "Verificación visual del encargo 4");
     await pagina.getByRole("dialog").getByRole("button", { name: "Empezar sesión" }).click();
-    await pagina.getByText("Sesión en curso").waitFor({ timeout: 10000 });
+    // "Sesión en curso" aparece en el lateral y en la sección 2 de Hoy:
+    // se acota cada superficie para no violar el modo estricto.
+    const tarjetaHoy = pagina.locator('section[aria-label="Sesión de trabajo"]');
+    await tarjetaHoy.getByText("Sesión en curso").waitFor({ timeout: 10000 });
+    await tarjetaHoy
+      .getByRole("button", { name: "Cerrar sesión de trabajo" })
+      .waitFor({ timeout: 5000 });
     await pagina.reload({ waitUntil: "networkidle" });
-    await pagina.getByText("Sesión en curso").waitFor({ timeout: 10000 });
+    await tarjetaHoy.getByText("Sesión en curso").waitFor({ timeout: 10000 });
     await pagina.screenshot({ path: `${DIR}/sesion-en-curso-${nombre}.png`, fullPage: true });
     await pagina.getByRole("button", { name: "Cerrar sesión de trabajo" }).first().click();
     await pagina.getByText("Qué avanzaste").waitFor({ timeout: 5000 });

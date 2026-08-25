@@ -10,7 +10,7 @@
 
 import { PrismaClient, Prisma } from "@prisma/client";
 import { hashContenido, parsearSecciones } from "../src/lib/brief";
-import { inicioDeSemana, instanteInicioDeSemana } from "../src/lib/semana";
+import { inicioDeSemana, instanteInicioDeSemana, rangoDeAyer } from "../src/lib/semana";
 
 const prisma = new PrismaClient();
 
@@ -732,8 +732,12 @@ const TAREAS_ENCARGO_4: SemillaTarea[] = [
 type SemillaSesion = {
   proyecto: "yajoma" | "cribo" | "orbia" | "orbita" | "flujo-specs";
   intencion: string;
-  semana: "esta" | "pasada";
-  // Día dentro de la semana (0 = lunes) y hora local aproximada.
+  // "ayer" ancla la sesión al día civil anterior a la siembra (Europe/
+  // Madrid): la sección de notas de ayer de la pantalla Hoy nunca nace
+  // vacía, se siembre el día que se siembre.
+  semana: "esta" | "pasada" | "ayer";
+  // Día dentro de la semana (0 = lunes; con "ayer" se ignora) y hora
+  // local aproximada.
   dia: number;
   hora: number;
   duracion_min: number;
@@ -872,6 +876,19 @@ const SESIONES_ENCARGO_4: SemillaSesion[] = [
     nota_avance: "Bloque 1 leído; salió una regla candidata para el Playbook.",
     siguiente_paso: "Listar los estados que ya usa Yajoma de facto",
     tarea: "Leer el bloque 1 del máster de specs",
+  },
+  // Encargo suelto de la pantalla Hoy: una nota de cierre de ayer
+  // garantizada, se siembre el día que se siembre.
+  {
+    proyecto: "orbita",
+    intencion: "Dejar preparado el encargo de la pantalla Hoy",
+    semana: "ayer",
+    dia: 0,
+    hora: 18,
+    duracion_min: 40,
+    estado: "cerrada",
+    nota_avance: "Encargo redactado con las cuatro secciones y su orden.",
+    siguiente_paso: "Revisar la pantalla Hoy en cuanto se despliegue",
   },
 ];
 
@@ -1132,9 +1149,12 @@ async function main() {
 
   // Dos semanas de sesiones de trabajo, ninguna activa.
   const inicioSemanaPasada = inicioSemana - 7 * 86_400_000;
+  const inicioAyer = rangoDeAyer(ahora).inicio.getTime();
   for (const s of SESIONES_ENCARGO_4) {
-    const base = s.semana === "esta" ? inicioSemana : inicioSemanaPasada;
-    let empieza = new Date(base + s.dia * 86_400_000 + s.hora * 3_600_000);
+    const base =
+      s.semana === "esta" ? inicioSemana : s.semana === "ayer" ? inicioAyer : inicioSemanaPasada;
+    const dia = s.semana === "ayer" ? 0 : s.dia;
+    let empieza = new Date(base + dia * 86_400_000 + s.hora * 3_600_000);
     // Nunca en el futuro: si el seed corre un lunes a primera hora, las
     // sesiones de esta semana se comprimen hacia atrás desde ahora.
     if (empieza.getTime() + s.duracion_min * 60_000 > ahora.getTime()) {

@@ -183,7 +183,11 @@ esto se ha implementado más allá de lo que se indica.
     7.** El siguiente paso ya se ve en la fila y el detalle; las
     bloqueadas guardan motivo y fecha de actualización. La pantalla Hoy
     completa y el destacado de bloqueadas de más de 3 días llegan con
-    H7.1.
+    H7.1. **Actualización del encargo suelto de la pantalla Hoy:**
+    avance parcial. El siguiente paso y el bloqueo ya se ven en Hoy,
+    porque la sección de tareas en curso reutiliza la fila de tarea; el
+    destacado específico de bloqueadas de más de 3 días y los avisos de
+    la sección 6 de H7.1 siguen pendientes del encargo 7.
 
 32. **Las actions de formulario devuelven lo escrito cuando fallan.**
     React resetea el formulario tras cada envío: sin ese eco, un fallo de
@@ -208,3 +212,40 @@ esto se ha implementado más allá de lo que se indica.
     tareas, 99 eventos y 11 sesiones de ejemplo son de desarrollo. El
     despliegue del encargo 4 solo actualiza el código; los datos que haya
     en producción se conservan tal cual.
+
+## Del encargo suelto de la pantalla Hoy (adelanto parcial de H7.1)
+
+37. **La sección de tareas muestra las en curso a secas.** El encargo
+    pide "tareas en curso, las bloqueadas marcadas": no se completa
+    hasta tres con las de semana de mayor prioridad, que es la lógica de
+    "las tres cosas de hoy" de la H7.1 completa y llega con el encargo
+    7. La cabecera del documento 01 (fecha y titular "Tres cosas hoy")
+    se mantiene tal cual aunque hoy la sección liste las en curso.
+
+38. **H1.3 aplicada al brief diario entero.** Un proyecto en pausa "no
+    aparece en el brief diario": sus tareas en curso, sus sesiones de
+    ayer y sus decisiones abiertas quedan fuera de las tres consultas de
+    la pantalla Hoy (los archivados también). Las tareas sin proyecto sí
+    entran.
+
+39. **Notas de cierre de ayer = sesiones terminadas en el día civil de
+    ayer en Europe/Madrid y con nota escrita.** El corte de medianoche
+    es exclusivo (una sesión cerrada a las 00:00 de hoy ya no es de
+    ayer) y los cambios de hora quedan absorbidos (ayer puede durar 23 o
+    25 horas; hay tests de ambos bordes). Una abandonada cuenta si
+    terminó ayer y su nota ya está escrita, marcada como "Quedó
+    abandonada". El seed añade una sesión anclada al día anterior a la
+    siembra para que la sección nunca nazca vacía.
+
+40. **R6 desactivada hace desaparecer la sección de decisiones entera,**
+    coherente con que desactivar una regla desactiva su validación (como
+    R1, R2 y R3). El umbral se lee de parametros.dias_umbral de la
+    última versión del playbook en cada petición (21 por defecto) y es
+    estricto: "más de 21 días" excluye la que lleva exactamente 21. El
+    cierre de decisiones no se duplica en Hoy: cada título enlaza al
+    detalle del proyecto, donde ya vive.
+
+41. **Sin anillos orbitales en la cabecera del brief diario.** El
+    documento 01 los sitúa ahí, pero codifican el avance del resultado
+    comprometido y este encargo pide omitir esa parte. Llegan con la
+    pantalla Hoy completa del encargo 7.

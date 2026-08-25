@@ -83,3 +83,26 @@ export function instanteFinDeSemana(instante: Date = new Date()): Date {
     dia: siguiente.getUTCDate(),
   });
 }
+
+function sumarDias(civil: FechaCivil, dias: number): FechaCivil {
+  const fecha = new Date(Date.UTC(civil.anio, civil.mes - 1, civil.dia + dias));
+  return { anio: fecha.getUTCFullYear(), mes: fecha.getUTCMonth() + 1, dia: fecha.getUTCDate() };
+}
+
+// Medianoche en Madrid del día civil del instante dado. Es el corte que
+// separa "hoy" de "ayer" para el brief diario.
+export function instanteInicioDeDia(instante: Date = new Date()): Date {
+  return instanteMedianocheMadrid(fechaCivilMadrid(instante));
+}
+
+// Rango [inicio, fin) del día civil anterior al instante, en Europe/Madrid.
+// El fin es la medianoche de hoy, exclusivo: una sesión cerrada a las
+// 00:00 de hoy ya no es de ayer. Los cambios de hora quedan absorbidos
+// por el cálculo de medianoche (el día de ayer puede durar 23 o 25 horas).
+export function rangoDeAyer(ahora: Date = new Date()): { inicio: Date; fin: Date } {
+  const hoy = fechaCivilMadrid(ahora);
+  return {
+    inicio: instanteMedianocheMadrid(sumarDias(hoy, -1)),
+    fin: instanteMedianocheMadrid(hoy),
+  };
+}

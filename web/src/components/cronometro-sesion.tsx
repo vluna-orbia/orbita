@@ -14,7 +14,7 @@ function segundosDesde(inicio: Date): number {
   return Math.max(0, Math.floor((Date.now() - new Date(inicio).getTime()) / 1000));
 }
 
-function useSegundos(inicio: Date): number | null {
+export function useSegundos(inicio: Date): number | null {
   // Primer render en null: el servidor no puede pintar un valor que
   // cambia cada segundo sin desincronizarse con la hidratación.
   const [segundos, setSegundos] = useState<number | null>(null);

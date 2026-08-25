@@ -173,6 +173,51 @@ for (const [ruta, esperados] of RUTAS_ENCARGO_4) {
   else mal("tarea inexistente", `status ${res.status}`);
 }
 
+// 6e. Pantalla Hoy reducida (encargo suelto, adelanta parte de H7.1):
+// cuatro secciones en orden, bloqueadas marcadas, notas de ayer y
+// decisiones sobre el umbral de R6 con quién las bloquea. Los textos con
+// interpolación se comprueban por fragmentos (React separa los nodos).
+{
+  const res = await fetch(BASE + "/hoy", { headers: { cookie: COOKIE } });
+  const html = await res.text();
+  const esperados = [
+    "En curso",
+    "Revisar la interfaz de tareas del encargo 4",
+    "Publicar el caso de éxito de Yajoma",
+    "Bloqueada:",
+    "Falta el visto bueno de Emilio para citar cifras",
+    "Sesión",
+    "Empezar sesión",
+    "Notas de cierre de ayer",
+    "Dejar preparado el encargo de la pantalla Hoy",
+    "Encargo redactado con las cuatro secciones y su orden.",
+    "Decisiones bloqueadas",
+    "regla R6",
+    "Bloquea",
+  ];
+  const faltan = esperados.filter((t) => !html.includes(t));
+  if (res.status === 200 && faltan.length === 0) {
+    ok("con sesión, /hoy muestra sus cuatro secciones con contenido");
+  } else {
+    mal("/hoy reducida", `status ${res.status}, faltan: ${faltan.join(", ")}`);
+  }
+  // El orden se ancla a los aria-label de las secciones: "Sesión" o "En
+  // curso" a secas también aparecen en el lateral y en el cronómetro.
+  const orden = [
+    html.indexOf('aria-label="Tareas en curso"'),
+    html.indexOf('aria-label="Sesión de trabajo"'),
+    html.indexOf('aria-label="Notas de cierre de ayer"'),
+    html.indexOf('aria-label="Decisiones bloqueadas"'),
+  ];
+  const bienOrdenadas =
+    orden.every((i) => i >= 0) && orden.every((v, i) => i === 0 || v > orden[i - 1]);
+  if (bienOrdenadas) {
+    ok("las secciones de /hoy van en el orden del encargo");
+  } else {
+    mal("orden de secciones de /hoy", `índices ${orden.join(", ")}`);
+  }
+}
+
 // 7. Un slug inexistente responde 404.
 {
   const res = await fetch(BASE + "/proyectos/no-existe", { headers: { cookie: COOKIE } });

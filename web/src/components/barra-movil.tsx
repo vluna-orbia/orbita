@@ -4,15 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CircleDashed, Plus, Radar, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { EVENTO_CAPTURAR } from "./capa-global";
 
 // En móvil el lateral colapsa a una barra inferior con cuatro destinos:
-// Hoy, Proyectos, Radar, Capturar. La captura vive con las tareas hasta
-// que exista el atajo c (encargo 4).
+// Hoy, Proyectos, Radar, Capturar. Capturar abre el campo de captura al
+// inbox (H2.1), el mismo que la tecla c (DUDA 8 resuelta).
 const DESTINOS = [
   { href: "/hoy", etiqueta: "Hoy", Icono: Sun },
   { href: "/proyectos", etiqueta: "Proyectos", Icono: CircleDashed },
   { href: "/radar", etiqueta: "Radar", Icono: Radar },
-  { href: "/tareas", etiqueta: "Capturar", Icono: Plus },
 ];
 
 export function BarraMovil() {
@@ -39,6 +39,14 @@ export function BarraMovil() {
           </Link>
         );
       })}
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new CustomEvent(EVENTO_CAPTURAR))}
+        className="flex min-h-[56px] flex-col items-center justify-center gap-1 text-tinta-tenue"
+      >
+        <Plus size={20} strokeWidth={1.75} aria-hidden="true" />
+        <span className="t-micro">Capturar</span>
+      </button>
     </nav>
   );
 }

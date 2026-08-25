@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { SesionLateral } from "./cronometro-sesion";
+import type { SesionActiva } from "@/lib/servicio-sesiones";
 
 const DESTINOS = [
   { href: "/hoy", etiqueta: "Hoy" },
@@ -13,9 +15,9 @@ const DESTINOS = [
   { href: "/playbook", etiqueta: "Playbook" },
 ];
 
-// Lateral de 216px con la navegación principal y el hueco reservado para
-// el cronómetro de sesión (el cronómetro llega con el encargo 4).
-export function Lateral() {
+// Lateral de 216px con la navegación principal y el cronómetro de sesión
+// (encargo 4): visible en todas las pantallas mientras haya sesión.
+export function Lateral({ sesion }: { sesion: SesionActiva | null }) {
   const ruta = usePathname();
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-[216px] flex-col border-r border-linea bg-papel px-4 py-6 md:flex">
@@ -45,10 +47,7 @@ export function Lateral() {
         })}
       </nav>
       <div className="mt-auto px-3">
-        <div className="border-t border-linea pt-4">
-          <p className="t-micro text-tinta-tenue">Sesión</p>
-          <p className="mt-1 text-[0.8125rem] text-tinta-tenue">Ninguna en curso</p>
-        </div>
+        <SesionLateral sesion={sesion} />
       </div>
     </aside>
   );

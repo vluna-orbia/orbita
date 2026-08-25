@@ -55,8 +55,9 @@ esto se ha implementado más allá de lo que se indica.
    anillo orbital tenga base de cálculo. El seed rico de H8.2 (30 tareas,
    sesiones, retro, hallazgos) llega con los encargos 4 a 7.
 
-8. **"Capturar" en la barra móvil** apunta a /tareas hasta que exista la
-   captura con la tecla c (encargo 4).
+8. **"Capturar" en la barra móvil** — **resuelta en el encargo 4.** El
+   botón deja de apuntar a /tareas y abre el mismo campo de captura que
+   la tecla c, desde cualquier pantalla.
 
 9. **Prisma fijado a 6.x y TypeScript a 5.x.** Prisma 7 elimina `url` en
    el datasource y cambia el flujo de configuración a `prisma.config.ts`
@@ -112,10 +113,11 @@ esto se ha implementado más allá de lo que se indica.
     interfaz. Lo mismo con el umbral de 21 días de R6 para destacar
     decisiones en ámbar.
 
-20. **Tareas del seed sin eventos de transición.** Las cinco tareas del
-    plan semanal no llevan TaskEvent: la máquina de estados con su log es
-    del encargo 4. Quien construya H2.2 decide si retro-genera eventos de
-    creación para el seed.
+20. **Tareas del seed sin eventos de transición** — **resuelta en el
+    encargo 4.** El seed retro-genera para cada tarea un rastro plausible
+    de eventos (creación en inbox y transiciones hasta su estado actual,
+    repartidas entre la captura y la última actividad): el historial del
+    detalle no nace vacío. Son fechas plausibles, no reales.
 
 21. **`WeeklyPlan.proyectos_activos` guarda slugs** (`["yajoma","cribo"]`),
     los dos proyectos con resultado comprometido declarado en la adenda
@@ -141,3 +143,68 @@ esto se ha implementado más allá de lo que se indica.
 25. **Editar un proyecto no cambia su slug.** Las URLs y el engine
     dependen de él; renombrar cambia el nombre visible y conserva el
     slug.
+
+## Del encargo 4
+
+26. **Hecha también desde semana, no solo desde en_curso.** H2.2 solo
+    restringe la entrada a en_curso ("solo desde semana"); la casilla de
+    la fila permite cerrar una tarea de semana sin pasar por en_curso,
+    porque exigir el paso intermedio obligaría a atravesar el límite de
+    WIP para marcar hecha una tarea de diez minutos. Inbox y backlog no
+    tienen casilla: una tarea sin triar no se cierra desde la lista.
+
+27. **La última actividad conocida de una sesión es el latido del
+    cronómetro.** Mientras la pestaña está abierta, el cronómetro avisa
+    al servidor cada 5 minutos y eso refresca updated_at. La detección de
+    huérfanas es perezosa (al leer la sesión activa o al arrancar otra),
+    sin job programado: pasadas 4 horas desde el último latido, la sesión
+    queda abandonada con la duración contada hasta ese latido. Margen de
+    error de hasta 5 minutos en la duración registrada, asumido.
+
+28. **El arranque de sesión pide proyecto.** WorkSession.project_id es
+    obligatorio en el esquema del encargo 2, así que no hay sesión sin
+    proyecto. La tarea vinculable es opcional y se filtra a las tareas en
+    semana o en curso del proyecto elegido. Un proyecto archivado no
+    admite sesiones; uno en pausa sí (H1.3 no lo prohíbe).
+
+29. **La arroba de la captura casa por prefijo y sin desplegable.**
+    @yajoma o @Flujo asignan proyecto por prefijo de nombre o slug, sin
+    distinguir mayúsculas ni acentos, entre proyectos no archivados. Si
+    el token no casa con ninguno, queda como texto en el título: el
+    proyecto nunca es obligatorio (H2.1 literal). Sin autocompletado: con
+    cinco proyectos no hace falta.
+
+30. **Arranque de sesión en móvil.** La tecla s no existe en pantalla
+    táctil y el lateral está oculto. El botón Empezar sesión vive en la
+    pantalla Hoy (anticipa la sección 2 de H7.1 sin construir la
+    pantalla). En escritorio están el lateral y la tecla s.
+
+31. **Lo que H2.4 y H2.5 dicen del brief diario queda para el encargo
+    7.** El siguiente paso ya se ve en la fila y el detalle; las
+    bloqueadas guardan motivo y fecha de actualización. La pantalla Hoy
+    completa y el destacado de bloqueadas de más de 3 días llegan con
+    H7.1.
+
+32. **Las actions de formulario devuelven lo escrito cuando fallan.**
+    React resetea el formulario tras cada envío: sin ese eco, un fallo de
+    validación (R3 sin siguiente paso) borraba la nota a medias. Patrón a
+    mantener en formularios nuevos con validación en servidor.
+
+33. **El avance de la nota de cierre es obligatorio siempre.** H3.2 marca
+    como opcional solo el bloqueo; R3 gobierna únicamente el siguiente
+    paso. Desactivar R3 permite cerrar sin siguiente paso, pero nunca sin
+    contar qué se avanzó.
+
+34. **El bloqueo es una bandera, no un estado.** Cualquier tarea no
+    terminal puede bloquearse con motivo obligatorio y tarea bloqueante
+    opcional. Una en_curso bloqueada libera su plaza de WIP al instante y
+    la recupera al desbloquearse, sin pasar por la máquina de estados.
+
+35. **El filtro de vencimiento tiene tres valores:** todas, vencidas y
+    próximos 7 días. H2.6 no concreta el corte; siete días casa con el
+    horizonte semanal del método.
+
+36. **Producción no se resiembra.** El seed es destructivo y las 36
+    tareas, 99 eventos y 11 sesiones de ejemplo son de desarrollo. El
+    despliegue del encargo 4 solo actualiza el código; los datos que haya
+    en producción se conservan tal cual.

@@ -22,7 +22,7 @@ const COOKIE = `orbita_sesion=${caducidad}.${firma}`;
 const RUTAS = [
   ["/hoy", ["Tres cosas hoy", "Órbita"]],
   ["/proyectos", ["Proyectos", "Nuevo proyecto", "Yajoma", "Archivados"]],
-  ["/tareas", ["Tareas", "límite de tres en curso"]],
+  ["/tareas", ["Tareas", "En curso"]],
   ["/radar", ["Radar", "por qué te importa"]],
   ["/rituales", ["Rituales", "retrospectiva"]],
   ["/playbook", ["Playbook", "adherencia"]],
@@ -118,6 +118,59 @@ for (const [ruta, esperados] of RUTAS_ENCARGO_3) {
   } else {
     mal(`con sesión, ${ruta}`, `faltan: ${faltan.join(", ")}`);
   }
+}
+
+// 6b. Rutas del encargo 4, con sesión.
+const RUTAS_ENCARGO_4 = [
+  ["/tareas", ["En curso 2 de 3", "Inbox", "Semana", "Revisar la interfaz de tareas del encargo 4", "Siguiente paso:"]],
+  ["/tareas?proyecto=yajoma&estado=backlog", ["Escribir la spec 017 del push de pedidos a Odoo"]],
+  ["/tareas?proyecto=sin-proyecto", ["Llamar a Siscom por el certificado TLS del servidor"]],
+  ["/tareas?vencimiento=vencidas", ["Apuntar los gastos de agosto para CAICONTA"]],
+  ["/tareas?agrupar=proyecto", ["Sin proyecto", "Yajoma"]],
+  ["/tareas?estado=hecha", ["Revisar y aprobar las specs 015 y 016"]],
+  ["/hoy", ["Empezar sesión"]],
+  ["/proyectos/yajoma", ["Sesiones", "Con nota de cierre"]],
+];
+for (const [ruta, esperados] of RUTAS_ENCARGO_4) {
+  const res = await fetch(BASE + ruta, { headers: { cookie: COOKIE } });
+  const html = await res.text();
+  if (res.status !== 200) {
+    mal(`con sesión, ${ruta}`, `status ${res.status}`);
+    continue;
+  }
+  const faltan = esperados.filter((t) => !html.includes(t));
+  if (faltan.length === 0) {
+    ok(`con sesión, ${ruta} muestra su contenido`);
+  } else {
+    mal(`con sesión, ${ruta}`, `faltan: ${faltan.join(", ")}`);
+  }
+}
+
+// 6c. El detalle de una tarea muestra el log de transiciones (H2.2).
+{
+  const res = await fetch(BASE + "/tareas?estado=en_curso", { headers: { cookie: COOKIE } });
+  const html = await res.text();
+  const enlace = /href="(\/tareas\/[a-z0-9]+)"/.exec(html)?.[1];
+  if (!enlace) {
+    mal("detalle de tarea", "no hay enlaces a tareas en la lista");
+  } else {
+    const detalle = await fetch(BASE + enlace, { headers: { cookie: COOKIE } });
+    const cuerpo = await detalle.text();
+    const esperados = ["Historial", "Creada en inbox", "Campos", "Guardar cambios"];
+    const faltan = esperados.filter((t) => !cuerpo.includes(t));
+    if (detalle.status === 200 && faltan.length === 0) {
+      ok(`con sesión, ${enlace} muestra el detalle con su historial`);
+    } else {
+      mal("detalle de tarea", `status ${detalle.status}, faltan: ${faltan.join(", ")}`);
+    }
+  }
+}
+
+// 6d. Una tarea inexistente responde 404.
+{
+  const res = await fetch(BASE + "/tareas/no-existe", { headers: { cookie: COOKIE } });
+  if (res.status === 404) ok("una tarea inexistente responde 404");
+  else mal("tarea inexistente", `status ${res.status}`);
 }
 
 // 7. Un slug inexistente responde 404.

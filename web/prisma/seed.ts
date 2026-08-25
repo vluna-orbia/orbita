@@ -665,6 +665,216 @@ const TAREAS_SEMANA: {
   },
 ];
 
+// Seed de tareas del encargo 4 (H8.2, en parte): unas treinta tareas
+// repartidas por estados, con contenido sacado de los briefs de la adenda
+// 04. Ninguna tarea nueva en estado semana o en_curso va a Yajoma o
+// Cribo: sus fracciones del anillo (1/3 y 1/2) son datos que los tests de
+// integración del encargo 3 asertan. Como mucho hay 2 tareas en curso que
+// cuentan para el WIP: queda una plaza libre con el límite de R1 en 3.
+type SemillaTarea = {
+  proyecto: "yajoma" | "cribo" | "orbia" | "orbita" | "flujo-specs" | null;
+  titulo: string;
+  estado: "inbox" | "backlog" | "semana" | "en_curso" | "hecha" | "descartada";
+  // Días hacia atrás desde el seed en que se capturó.
+  capturada_hace: number;
+  // Semana de la finalización, solo para hechas.
+  completada?: "esta_semana" | "semana_pasada";
+  estimacion_min?: number;
+  siguiente_paso?: string;
+  motivo_bloqueo?: string;
+  vence_en_dias?: number;
+  notas?: string;
+};
+
+const TAREAS_ENCARGO_4: SemillaTarea[] = [
+  // Inbox: capturas crudas, la mayoría sin proyecto (R4).
+  { proyecto: null, titulo: "Llamar a Siscom por el certificado TLS del servidor", estado: "inbox", capturada_hace: 1 },
+  { proyecto: "cribo", titulo: "Mirar precios de GPU en Hetzner para el piloto", estado: "inbox", capturada_hace: 2 },
+  { proyecto: null, titulo: "Apuntar los gastos de agosto para CAICONTA", estado: "inbox", capturada_hace: 3, vence_en_dias: -2 },
+  { proyecto: null, titulo: "Leer el artículo guardado sobre onboarding B2B", estado: "inbox", capturada_hace: 4 },
+  { proyecto: "orbia", titulo: "Renovar el dominio orbiasolutions.com", estado: "inbox", capturada_hace: 1, vence_en_dias: 20 },
+  // Backlog por proyecto.
+  { proyecto: "yajoma", titulo: "Escribir la spec 017 del push de pedidos a Odoo", estado: "backlog", capturada_hace: 9, estimacion_min: 120 },
+  { proyecto: "yajoma", titulo: "Preparar el alta manual de los 178 clientes para el go-live", estado: "backlog", capturada_hace: 12, estimacion_min: 240, siguiente_paso: "Pedir a Alba el listado con emails verificados" },
+  { proyecto: "yajoma", titulo: "Documentar la implantación para el organismo de la subvención", estado: "backlog", capturada_hace: 15, estimacion_min: 180, vence_en_dias: 12 },
+  { proyecto: "cribo", titulo: "Cotizar el seguro de RC con ciberriesgo", estado: "backlog", capturada_hace: 10, estimacion_min: 60 },
+  { proyecto: "cribo", titulo: "Comprobar disponibilidad de cribo.es y cribo.app", estado: "backlog", capturada_hace: 8, estimacion_min: 15 },
+  { proyecto: "cribo", titulo: "Preparar el guion de la sesión de arranque con Tecsem", estado: "backlog", capturada_hace: 6, estimacion_min: 90, vence_en_dias: 14 },
+  { proyecto: "orbia", titulo: "Esbozar la oferta empaquetada de automatización para pymes", estado: "backlog", capturada_hace: 18, estimacion_min: 120 },
+  { proyecto: "orbia", titulo: "Actualizar la web de Orbia con el caso de Yajoma", estado: "backlog", capturada_hace: 14, estimacion_min: 90 },
+  { proyecto: "orbita", titulo: "Revisar el ENTREGA del encargo 4", estado: "backlog", capturada_hace: 2, estimacion_min: 45 },
+  { proyecto: "flujo-specs", titulo: "Extraer la plantilla de spec del máster", estado: "backlog", capturada_hace: 7, estimacion_min: 90 },
+  // Semana y en curso, solo en proyectos sin resultado comprometido.
+  { proyecto: "orbia", titulo: "Enviar la factura de agosto a Yajoma", estado: "semana", capturada_hace: 3, estimacion_min: 20, vence_en_dias: 5 },
+  { proyecto: "flujo-specs", titulo: "Definir los estados de una spec y sus transiciones", estado: "semana", capturada_hace: 5, estimacion_min: 120, siguiente_paso: "Listar los estados que ya usa Yajoma de facto" },
+  { proyecto: "orbita", titulo: "Verificar el encargo 4 en producción", estado: "semana", capturada_hace: 1, estimacion_min: 30 },
+  { proyecto: "orbita", titulo: "Revisar la interfaz de tareas del encargo 4", estado: "en_curso", capturada_hace: 2, estimacion_min: 60, siguiente_paso: "Probar el aviso de WIP con tres en curso" },
+  { proyecto: "orbia", titulo: "Preparar la propuesta para el segundo cliente", estado: "en_curso", capturada_hace: 11, estimacion_min: 150, siguiente_paso: "Cerrar el alcance de la fase 1 en una página" },
+  { proyecto: "orbia", titulo: "Publicar el caso de éxito de Yajoma", estado: "en_curso", capturada_hace: 13, estimacion_min: 60, motivo_bloqueo: "Falta el visto bueno de Emilio para citar cifras" },
+  // Hechas de la semana pasada.
+  { proyecto: "yajoma", titulo: "Corregir el desbordamiento del catálogo en móvil", estado: "hecha", capturada_hace: 12, completada: "semana_pasada", estimacion_min: 45 },
+  { proyecto: "yajoma", titulo: "Regenerar la API key de Odoo caducada", estado: "hecha", capturada_hace: 10, completada: "semana_pasada", estimacion_min: 15 },
+  { proyecto: "cribo", titulo: "Enviar el copy final de la web a revisión", estado: "hecha", capturada_hace: 11, completada: "semana_pasada", estimacion_min: 30 },
+  { proyecto: "cribo", titulo: "Preparar la documentación de arranque de startTIC", estado: "hecha", capturada_hace: 16, completada: "semana_pasada", estimacion_min: 120 },
+  { proyecto: "orbita", titulo: "Revisar el ENTREGA del encargo 2", estado: "hecha", capturada_hace: 9, completada: "semana_pasada", estimacion_min: 45 },
+  { proyecto: "flujo-specs", titulo: "Recopilar los ADRs existentes de Yajoma", estado: "hecha", capturada_hace: 14, completada: "semana_pasada", estimacion_min: 60 },
+  // Hechas esta semana, fuera de Yajoma y Cribo.
+  { proyecto: "orbita", titulo: "Revisar el ENTREGA del encargo 3", estado: "hecha", capturada_hace: 4, completada: "esta_semana", estimacion_min: 45 },
+  { proyecto: "flujo-specs", titulo: "Leer el bloque 1 del máster de specs", estado: "hecha", capturada_hace: 6, completada: "esta_semana", estimacion_min: 90, notas: "Produjo la regla candidata: toda spec declara cómo se verifica." },
+  // Descartadas.
+  { proyecto: "orbita", titulo: "Probar otra herramienta de gestión de tareas", estado: "descartada", capturada_hace: 20 },
+  { proyecto: "orbia", titulo: "Montar un CRM para Orbia", estado: "descartada", capturada_hace: 17 },
+];
+
+// Dos semanas de sesiones de trabajo (H8.2, en parte): cerradas con su
+// nota, alguna sin siguiente paso de los tiempos en que R3 se saltaba, y
+// una abandonada ya anotada. Ninguna activa: el cronómetro arranca limpio.
+type SemillaSesion = {
+  proyecto: "yajoma" | "cribo" | "orbia" | "orbita" | "flujo-specs";
+  intencion: string;
+  semana: "esta" | "pasada";
+  // Día dentro de la semana (0 = lunes) y hora local aproximada.
+  dia: number;
+  hora: number;
+  duracion_min: number;
+  estado: "cerrada" | "abandonada";
+  nota_avance?: string;
+  nota_bloqueo?: string;
+  siguiente_paso?: string;
+  // Título de la tarea del seed a la que se vincula, si procede.
+  tarea?: string;
+};
+
+const SESIONES_ENCARGO_4: SemillaSesion[] = [
+  {
+    proyecto: "yajoma",
+    intencion: "Cerrar la revisión de las specs 015 y 016",
+    semana: "pasada",
+    dia: 0,
+    hora: 9,
+    duracion_min: 70,
+    estado: "cerrada",
+    nota_avance: "Specs revisadas con comentarios menores en la 016.",
+    siguiente_paso: "Pasar los comentarios a la 016 y pedir aprobación",
+  },
+  {
+    proyecto: "yajoma",
+    intencion: "Reproducir el desbordamiento del catálogo en móvil",
+    semana: "pasada",
+    dia: 1,
+    hora: 16,
+    duracion_min: 45,
+    estado: "cerrada",
+    nota_avance: "Era el contenedor de filtros: corregido y desplegado en development.",
+    siguiente_paso: "Comprobarlo en producción tras el siguiente deploy",
+  },
+  {
+    proyecto: "yajoma",
+    intencion: "Regenerar la API key de Odoo y verificar el sync",
+    semana: "pasada",
+    dia: 2,
+    hora: 10,
+    duracion_min: 25,
+    estado: "cerrada",
+    nota_avance: "Clave regenerada; el sync volvió a la primera.",
+    nota_bloqueo: "Seguimos sin aviso previo de caducidad: riesgo S-14 abierto.",
+  },
+  {
+    proyecto: "cribo",
+    intencion: "Repasar el copy final de la web antes de enviarlo",
+    semana: "pasada",
+    dia: 2,
+    hora: 17,
+    duracion_min: 40,
+    estado: "cerrada",
+    nota_avance: "Copy enviado a revisión con dos dudas marcadas.",
+    siguiente_paso: "Esperar la vuelta y cerrar el hero",
+  },
+  {
+    proyecto: "cribo",
+    intencion: "Ordenar la documentación de startTIC",
+    semana: "pasada",
+    dia: 3,
+    hora: 11,
+    duracion_min: 90,
+    estado: "abandonada",
+    nota_avance: "Documentación ordenada a medias; me llamaron de Yajoma y no volví.",
+    // Sin siguiente paso: quedó abandonada y se anotó después.
+  },
+  {
+    proyecto: "orbia",
+    intencion: "Esbozar la propuesta del segundo cliente",
+    semana: "pasada",
+    dia: 4,
+    hora: 9,
+    duracion_min: 60,
+    estado: "cerrada",
+    nota_avance: "Estructura de la propuesta hecha; falta el precio.",
+    siguiente_paso: "Cerrar el alcance de la fase 1 en una página",
+    tarea: "Preparar la propuesta para el segundo cliente",
+  },
+  {
+    proyecto: "yajoma",
+    intencion: "Arrancar la implementación de la spec 015",
+    semana: "esta",
+    dia: 0,
+    hora: 9,
+    duracion_min: 85,
+    estado: "cerrada",
+    nota_avance: "Migración del mapa categoría a departamento escrita y probada en local.",
+    siguiente_paso: "Escribir la migración del mapa categoría a departamento",
+    tarea: "Implementar la spec 015 en development",
+  },
+  {
+    proyecto: "cribo",
+    intencion: "Revisar la maqueta del hero con el copy final",
+    semana: "esta",
+    dia: 0,
+    hora: 16,
+    duracion_min: 45,
+    estado: "cerrada",
+    nota_avance: "Maqueta revisada y aprobada: el hero queda cerrado.",
+    siguiente_paso: "Pasar a la entrada unificada",
+    tarea: "Revisar la maqueta del hero con el copy final",
+  },
+  {
+    proyecto: "orbita",
+    intencion: "Revisar la entrega del encargo 3 en producción",
+    semana: "esta",
+    dia: 0,
+    hora: 19,
+    duracion_min: 30,
+    estado: "cerrada",
+    nota_avance: "Anillo y decisiones revisados en producción; todo en orden.",
+    siguiente_paso: "Lanzar el encargo 4 con el ENTREGA adjunto",
+    tarea: "Revisar el ENTREGA del encargo 3",
+  },
+  {
+    proyecto: "orbita",
+    intencion: "Probar la captura y el límite de WIP del encargo 4",
+    semana: "esta",
+    dia: 1,
+    hora: 12,
+    duracion_min: 55,
+    estado: "cerrada",
+    nota_avance: "Captura con la tecla c probada; el aviso de WIP muestra las tres en curso.",
+    siguiente_paso: "Probar el aviso de WIP con tres en curso",
+    tarea: "Revisar la interfaz de tareas del encargo 4",
+  },
+  {
+    proyecto: "flujo-specs",
+    intencion: "Leer el bloque 1 del máster produciendo artefacto",
+    semana: "esta",
+    dia: 1,
+    hora: 18,
+    duracion_min: 75,
+    estado: "cerrada",
+    nota_avance: "Bloque 1 leído; salió una regla candidata para el Playbook.",
+    siguiente_paso: "Listar los estados que ya usa Yajoma de facto",
+    tarea: "Leer el bloque 1 del máster de specs",
+  },
+];
+
 // ---------- Carga ----------
 
 async function main() {
@@ -802,20 +1012,149 @@ async function main() {
     });
   }
   // Completadas dentro de la semana en curso, pase cuando pase el seed.
+  const inicioSemana = instanteInicioDeSemana(ahora).getTime();
   const completadaEl = new Date(
-    Math.max(instanteInicioDeSemana(ahora).getTime() + 3_600_000, ahora.getTime() - 3 * 3_600_000)
+    Math.max(inicioSemana + 3_600_000, ahora.getTime() - 3 * 3_600_000)
   );
-  for (const t of TAREAS_SEMANA) {
-    await prisma.task.create({
+
+  // Cadena de estados por la que pasó una tarea hasta su estado actual,
+  // para retro-generar su log de transiciones (DUDA 20 resuelta): el
+  // detalle de tarea no nace vacío. Las descartadas del seed se
+  // descartaron desde el inbox.
+  const CADENAS: Record<string, string[]> = {
+    inbox: ["inbox"],
+    backlog: ["inbox", "backlog"],
+    semana: ["inbox", "backlog", "semana"],
+    en_curso: ["inbox", "backlog", "semana", "en_curso"],
+    hecha: ["inbox", "backlog", "semana", "hecha"],
+    descartada: ["inbox", "descartada"],
+  };
+
+  // Crea una tarea con su rastro de eventos: creación en inbox en
+  // `capturada`, y el resto de transiciones repartidas hasta `ultima`.
+  async function crearTareaConEventos(datos: {
+    proyectoSlug: string | null;
+    titulo: string;
+    estado: string;
+    capturada: Date;
+    ultima: Date;
+    estimacion_min?: number | null;
+    siguiente_paso?: string | null;
+    motivo_bloqueo?: string | null;
+    vence_el?: Date | null;
+    notas?: string | null;
+    completed_at?: Date | null;
+  }) {
+    const cadena = CADENAS[datos.estado];
+    const tarea = await prisma.task.create({
       data: {
         user_id: USER_ID,
-        project_id: porSlug[t.proyecto],
-        titulo: t.titulo,
-        estado: t.estado,
-        estimacion_min: t.estimacion_min,
-        siguiente_paso: t.siguiente_paso ?? null,
+        project_id: datos.proyectoSlug ? porSlug[datos.proyectoSlug] : null,
+        titulo: datos.titulo,
+        estado: datos.estado as "inbox",
+        estimacion_min: datos.estimacion_min ?? null,
+        siguiente_paso: datos.siguiente_paso ?? null,
+        motivo_bloqueo: datos.motivo_bloqueo ?? null,
+        vence_el: datos.vence_el ?? null,
+        notas: datos.notas ?? null,
         origen: "manual",
-        completed_at: t.estado === "hecha" ? completadaEl : null,
+        completed_at: datos.completed_at ?? null,
+        created_at: datos.capturada,
+      },
+    });
+    const tramo = (datos.ultima.getTime() - datos.capturada.getTime()) / cadena.length;
+    for (let i = 0; i < cadena.length; i++) {
+      const esUltimo = i === cadena.length - 1;
+      await prisma.taskEvent.create({
+        data: {
+          user_id: USER_ID,
+          task_id: tarea.id,
+          estado_anterior: i === 0 ? null : cadena[i - 1],
+          estado_nuevo: cadena[i],
+          created_at: esUltimo && datos.completed_at
+            ? datos.completed_at
+            : new Date(datos.capturada.getTime() + tramo * i),
+        },
+      });
+    }
+    return tarea;
+  }
+
+  // Las cinco tareas del plan semanal (encargo 3), ahora con su log.
+  const tareasPorTitulo: Record<string, string> = {};
+  for (const t of TAREAS_SEMANA) {
+    const tarea = await crearTareaConEventos({
+      proyectoSlug: t.proyecto,
+      titulo: t.titulo,
+      estado: t.estado,
+      capturada: new Date(ahora.getTime() - 5 * 86_400_000),
+      ultima: t.estado === "hecha" ? completadaEl : ahora,
+      estimacion_min: t.estimacion_min,
+      siguiente_paso: t.siguiente_paso ?? null,
+      completed_at: t.estado === "hecha" ? completadaEl : null,
+    });
+    tareasPorTitulo[t.titulo] = tarea.id;
+  }
+
+  // El seed de tareas del encargo 4 (H8.2, en parte).
+  const finSemanaPasada = new Date(inicioSemana - 3_600_000);
+  for (const t of TAREAS_ENCARGO_4) {
+    const capturada = new Date(ahora.getTime() - t.capturada_hace * 86_400_000);
+    const completada =
+      t.estado === "hecha"
+        ? t.completada === "esta_semana"
+          ? completadaEl
+          : new Date(Math.max(finSemanaPasada.getTime() - 2 * 86_400_000, capturada.getTime() + 3_600_000))
+        : null;
+    const tarea = await crearTareaConEventos({
+      proyectoSlug: t.proyecto,
+      titulo: t.titulo,
+      estado: t.estado,
+      capturada,
+      ultima: completada ?? new Date(Math.min(ahora.getTime(), capturada.getTime() + 2 * 86_400_000)),
+      estimacion_min: t.estimacion_min ?? null,
+      siguiente_paso: t.siguiente_paso ?? null,
+      motivo_bloqueo: t.motivo_bloqueo ?? null,
+      vence_el: t.vence_en_dias !== undefined
+        ? new Date(ahora.getTime() + t.vence_en_dias * 86_400_000)
+        : null,
+      notas: t.notas ?? null,
+      completed_at: completada,
+    });
+    tareasPorTitulo[t.titulo] = tarea.id;
+  }
+
+  // La tarea bloqueada del seed apunta a la que la bloquea (H2.5).
+  await prisma.task.update({
+    where: { id: tareasPorTitulo["Publicar el caso de éxito de Yajoma"] },
+    data: { bloqueada_por: tareasPorTitulo["Actualizar la web de Orbia con el caso de Yajoma"] },
+  });
+
+  // Dos semanas de sesiones de trabajo, ninguna activa.
+  const inicioSemanaPasada = inicioSemana - 7 * 86_400_000;
+  for (const s of SESIONES_ENCARGO_4) {
+    const base = s.semana === "esta" ? inicioSemana : inicioSemanaPasada;
+    let empieza = new Date(base + s.dia * 86_400_000 + s.hora * 3_600_000);
+    // Nunca en el futuro: si el seed corre un lunes a primera hora, las
+    // sesiones de esta semana se comprimen hacia atrás desde ahora.
+    if (empieza.getTime() + s.duracion_min * 60_000 > ahora.getTime()) {
+      empieza = new Date(ahora.getTime() - (s.duracion_min + 30) * 60_000);
+    }
+    const termina = new Date(empieza.getTime() + s.duracion_min * 60_000);
+    await prisma.workSession.create({
+      data: {
+        user_id: USER_ID,
+        project_id: porSlug[s.proyecto],
+        task_id: s.tarea ? tareasPorTitulo[s.tarea] ?? null : null,
+        intencion: s.intencion,
+        started_at: empieza,
+        ended_at: termina,
+        duracion_min: s.duracion_min,
+        nota_avance: s.nota_avance ?? null,
+        nota_bloqueo: s.nota_bloqueo ?? null,
+        siguiente_paso: s.siguiente_paso ?? null,
+        estado: s.estado,
+        created_at: empieza,
       },
     });
   }
@@ -829,6 +1168,8 @@ async function main() {
     planes: await prisma.weeklyPlan.count(),
     resultados: await prisma.weeklyOutcome.count(),
     tareas: await prisma.task.count(),
+    eventos: await prisma.taskEvent.count(),
+    sesiones: await prisma.workSession.count(),
   };
   console.log("Seed cargado:", JSON.stringify(resumen));
 }

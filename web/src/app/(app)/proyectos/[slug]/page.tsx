@@ -9,9 +9,10 @@ import { AvisoBanner } from "@/components/aviso-banner";
 import { DecisionesAbiertas } from "@/components/decisiones-abiertas";
 import { EstadoVacio } from "@/components/estado-vacio";
 import { Button } from "@/components/ui/button";
-import { fechaConHora } from "@/lib/formato";
+import { fechaConHora, fechaCorta } from "@/lib/formato";
 import { prisma } from "@/lib/prisma";
 import { mensajeLimiteAlActivar } from "@/lib/proyectos";
+import { formatoMinutos } from "@/lib/sesiones";
 import {
   briefCambioDesdeDerivacion,
   decisionesAbiertas,
@@ -19,6 +20,7 @@ import {
   resumenDeProyecto,
   umbralDiasR6,
 } from "@/lib/servicio-proyectos";
+import { historialDeSesiones } from "@/lib/servicio-sesiones";
 import { cambiarEstadoAction } from "../acciones";
 
 export const dynamic = "force-dynamic";
@@ -67,16 +69,18 @@ export default async function DetalleProyecto({
   const proyecto = await resumenDeProyecto(prisma, slug);
   if (!proyecto) notFound();
 
-  const [ultimaVersion, totalVersiones, decisiones, umbral, limite] = await Promise.all([
-    prisma.projectBrief.findFirst({
-      where: { project_id: proyecto.id },
-      orderBy: { version: "desc" },
-    }),
-    prisma.projectBrief.count({ where: { project_id: proyecto.id } }),
-    decisionesAbiertas(prisma, proyecto.id),
-    umbralDiasR6(prisma),
-    limiteDeActivos(prisma),
-  ]);
+  const [ultimaVersion, totalVersiones, decisiones, umbral, limite, historial] =
+    await Promise.all([
+      prisma.projectBrief.findFirst({
+        where: { project_id: proyecto.id },
+        orderBy: { version: "desc" },
+      }),
+      prisma.projectBrief.count({ where: { project_id: proyecto.id } }),
+      decisionesAbiertas(prisma, proyecto.id),
+      umbralDiasR6(prisma),
+      limiteDeActivos(prisma),
+      historialDeSesiones(prisma, proyecto.id),
+    ]);
 
   const avisoDerivacion = ultimaVersion
     ? await briefCambioDesdeDerivacion(prisma, proyecto.id)
@@ -240,6 +244,53 @@ export default async function DetalleProyecto({
           </span>
         </h2>
         <DecisionesAbiertas decisiones={decisiones} slug={proyecto.slug} umbralDias={umbral} />
+      </section>
+
+      <section className="mt-12 max-w-[68ch]" aria-label="Sesiones por semana">
+        <h2 className="text-[1.25rem] font-semibold leading-[1.3]">Sesiones</h2>
+        {historial.length === 0 ? (
+          <p className="mt-4 text-[0.9375rem] leading-[1.6] text-tinta-media">
+            Todavía no hay sesiones cerradas en este proyecto. Pulsa s para empezar una con su
+            intención declarada.
+          </p>
+        ) : (
+          <table className="mt-4 w-full border-separate border-spacing-0 text-left">
+            <thead>
+              <tr>
+                <th className="t-micro border-b border-linea pb-2 pr-4 font-medium text-tinta-tenue">
+                  Semana del
+                </th>
+                <th className="t-micro border-b border-linea pb-2 pr-4 font-medium text-tinta-tenue">
+                  Sesiones
+                </th>
+                <th className="t-micro border-b border-linea pb-2 pr-4 font-medium text-tinta-tenue">
+                  Minutos
+                </th>
+                <th className="t-micro border-b border-linea pb-2 font-medium text-tinta-tenue">
+                  Con nota de cierre
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {historial.map((s) => (
+                <tr key={s.semanaInicio.toISOString()}>
+                  <td className="t-dato border-b border-linea py-2.5 pr-4 text-[0.875rem] text-tinta">
+                    {fechaCorta(s.semanaInicio)}
+                  </td>
+                  <td className="t-dato border-b border-linea py-2.5 pr-4 text-[0.875rem] text-tinta-media">
+                    {s.sesiones}
+                  </td>
+                  <td className="t-dato border-b border-linea py-2.5 pr-4 text-[0.875rem] text-tinta-media">
+                    {formatoMinutos(s.minutos)}
+                  </td>
+                  <td className="t-dato border-b border-linea py-2.5 text-[0.875rem] text-tinta-media">
+                    {s.porcentajeConNota} %
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </section>
     </>
   );

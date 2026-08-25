@@ -49,16 +49,17 @@ export function AnilloOrbital({
     >
       <defs>
         <filter id={filtroId} x="-30%" y="-30%" width="160%" height="160%">
-          {/* Frecuencia baja: ondulación larga de trazo a mano, no grano
-              que desintegre la línea. */}
+          {/* Temblor contenido (variante elegida en el encargo 3): onda
+              corta y poca amplitud, la imperfección justa. Frecuencias
+              altas con más escala desintegran el trazo en grano. */}
           <feTurbulence
             type="fractalNoise"
-            baseFrequency="0.022"
+            baseFrequency="0.03"
             numOctaves="2"
             seed={semillaDesde(id)}
             result="ruido"
           />
-          <feDisplacementMap in="SourceGraphic" in2="ruido" scale="5" />
+          <feDisplacementMap in="SourceGraphic" in2="ruido" scale="3" />
         </filter>
       </defs>
       <g filter={`url(#${filtroId})`} transform="rotate(-90 32 32)">

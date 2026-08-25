@@ -60,7 +60,7 @@ encargo.
   validación y reglas en el servicio. El middleware exige sesión también
   en las actions.
 - `web/src/components/anillo-orbital.tsx` — SVG con feTurbulence
-  (baseFrequency 0.022) + feDisplacementMap (scale 5) y semilla estable
+  (baseFrequency 0.03) + feDisplacementMap (scale 3) y semilla estable
   por proyecto: trazo irregular, nunca un círculo limpio. Arco que se
   cierra con el avance; sin resultado comprometido, trazo abierto y
   discontinuo; en pausa, gris al 30%. Se dibuja una vez al cargar (600ms,
@@ -155,10 +155,10 @@ encargo.
 
 ## Qué falta verificar a mano
 
-- **El anillo orbital en tu navegador y a tu gusto**: la irregularidad
-  del trazo (feTurbulence 0.022, scale 5) está calibrada en Chromium;
-  míralo en Safari y en pantalla de alta densidad. Si el temblor te
-  parece poco o mucho, se ajusta en `anillo-orbital.tsx`.
+- **El anillo orbital en Safari y en pantalla de alta densidad**: el
+  temblor (feTurbulence 0.03, scale 3, la variante contenida que eligió
+  el usuario entre cuatro) está calibrado en Chromium. Se ajusta en
+  `anillo-orbital.tsx`.
 - **El flujo completo de cierre de una decisión en producción** con tu
   sesión: elegir opción, escribir motivo, ver el aviso "Decisión
   cerrada" y comprobar que desaparece del listado.

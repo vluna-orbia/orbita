@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+/* Tokens del sistema de diseño de Órbita (documento 01). No son
+   sugerencias: cualquier color fuera de esta paleta es un error. */
+@theme {
+  /* Superficies */
+  --color-papel: #fcf9f4;
+  --color-papel-hondo: #f6f1e8;
+  --color-superficie: #ffffff;
+
+  /* Tinta */
+  --color-tinta: #14110f;
+  --color-tinta-media: #4a443e;
+  --color-tinta-tenue: #8a827a;
+  --color-linea: #e5ddd1;
+
+  /* Coral — el acento de Orbia. Solo donde hay que actuar. */
+  --color-coral: #f2612c;
+  --color-coral-hondo: #d14a18;
+  --color-coral-suave: #f9ae8e;
+  --color-coral-velo: #fdede5;
+
+  /* Semánticos — desaturados, nunca compiten con el coral */
+  --color-verde: #3f7d5e;
+  --color-ambar: #b8862b;
+  --color-rojo: #b33a26;
+
+  /* Tipografía: display / interfaz / datos */
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Instrument Serif", ui-serif, Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Foco de teclado visible, en coral y con 2px de desplazamiento. */
+:focus-visible {
+  outline: 2px solid var(--color-coral);
+  outline-offset: 2px;
+}
+
+/* Datos: cronómetros, duraciones, costes, fechas en tablas. */
+.t-dato {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Etiqueta micro: MAYÚSCULAS con tracking ancho. */
+.t-micro {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

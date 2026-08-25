@@ -1,0 +1,439 @@
+// Órbita — esquema de datos. Encargo 2.
+// Prisma es el dueño del esquema. El engine (FastAPI) lee y escribe con
+// SQLAlchemy sobre estas mismas tablas, sin migraciones propias.
+// Todas las entidades llevan user_id (valor fijo por ahora), created_at
+// y updated_at, para no bloquear una futura versión multiusuario.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Enums ----------
+
+enum ProjectEstado {
+  activo
+  pausado
+  archivado
+}
+
+// Adenda 05: el tipo modifica el comportamiento de R1, R2 y R5.
+enum ProjectTipo {
+  entrega
+  continuo
+}
+
+enum TaskEstado {
+  inbox
+  backlog
+  semana
+  en_curso
+  hecha
+  descartada
+}
+
+enum TaskOrigen {
+  manual
+  hallazgo
+  ritual
+}
+
+enum SessionEstado {
+  activa
+  cerrada
+  abandonada
+}
+
+enum SourceTipo {
+  youtube_channel
+  web_feed
+  search
+}
+
+enum AccionSugerida {
+  crear_tarea
+  revisar_decision
+  solo_leer
+  descartar
+}
+
+enum FindingEstado {
+  nuevo
+  leido
+  guardado
+  descartado
+  convertido
+}
+
+// Adenda 04: las decisiones abiertas tienen entidad propia.
+enum DecisionEstado {
+  abierta
+  cerrada
+  caducada
+}
+
+// ---------- Entidades ----------
+
+model Project {
+  id             String        @id @default(cuid())
+  user_id        String
+  nombre         String
+  cliente        String?
+  slug           String        @unique
+  objetivo       String        @db.VarChar(280)
+  estado         ProjectEstado @default(activo)
+  color_acento   String
+  orden          Int
+  // Adenda 05: entrega | continuo. Modifica R1, R2 y R5.
+  tipo           ProjectTipo   @default(entrega)
+  // Adenda 05: solo relevante en proyectos de tipo continuo.
+  horas_objetivo Int?
+  created_at     DateTime      @default(now())
+  updated_at     DateTime      @updatedAt
+
+  briefs          ProjectBrief[]
+  tasks           Task[]
+  work_sessions   WorkSession[]
+  weekly_outcomes WeeklyOutcome[]
+  intents         ResearchIntent[]
+  findings        Finding[]
+  notes           Note[]
+  decisions       Decision[]
+  milestones      Milestone[]
+
+  @@map("projects")
+}
+
+model ProjectBrief {
+  id           String   @id @default(cuid())
+  user_id      String
+  project_id   String
+  version      Int
+  contenido_md String   @db.Text
+  content_hash String
+  // Secciones parseadas: contexto, objetivos, requerimientos, stack,
+  // decisiones_abiertas, riesgos.
+  secciones    Json
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@unique([project_id, version])
+  @@map("project_briefs")
+}
+
+model Task {
+  id             String     @id @default(cuid())
+  user_id        String
+  project_id     String?
+  titulo         String
+  notas          String?    @db.Text
+  estado         TaskEstado @default(inbox)
+  prioridad      Int?
+  estimacion_min Int?
+  vence_el       DateTime?
+  siguiente_paso String?
+  // Otra tarea que la bloquea (H2.5), opcional.
+  bloqueada_por  String?
+  motivo_bloqueo String?
+  origen         TaskOrigen @default(manual)
+  completed_at   DateTime?
+  created_at     DateTime   @default(now())
+  updated_at     DateTime   @updatedAt
+
+  project    Project?    @relation(fields: [project_id], references: [id], onDelete: SetNull)
+  bloqueante Task?       @relation("TareaBloqueante", fields: [bloqueada_por], references: [id], onDelete: SetNull)
+  bloqueadas Task[]      @relation("TareaBloqueante")
+  events     TaskEvent[]
+  findings   Finding[]
+
+  @@map("tasks")
+}
+
+model TaskEvent {
+  id              String   @id @default(cuid())
+  user_id         String
+  task_id         String
+  // Nulo en el evento de creación.
+  estado_anterior String?
+  estado_nuevo    String
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  task Task @relation(fields: [task_id], references: [id], onDelete: Cascade)
+
+  @@map("task_events")
+}
+
+model WorkSession {
+  id             String        @id @default(cuid())
+  user_id        String
+  project_id     String
+  task_id        String?
+  intencion      String
+  started_at     DateTime
+  ended_at       DateTime?
+  duracion_min   Int?
+  nota_avance    String?       @db.Text
+  nota_bloqueo   String?       @db.Text
+  siguiente_paso String?
+  estado         SessionEstado @default(activa)
+  created_at     DateTime      @default(now())
+  updated_at     DateTime      @updatedAt
+
+  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@map("work_sessions")
+}
+
+model WeeklyPlan {
+  id                String   @id @default(cuid())
+  user_id           String
+  // Lunes de la semana, único: una planificación por semana.
+  semana_inicio     DateTime @unique @db.Date
+  proyectos_activos Json
+  completado_paso   Int      @default(0)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  outcomes WeeklyOutcome[]
+  retro    Retro?
+
+  @@map("weekly_plans")
+}
+
+model WeeklyOutcome {
+  id             String   @id @default(cuid())
+  user_id        String
+  weekly_plan_id String
+  project_id     String
+  descripcion    String
+  // Nulo hasta la retrospectiva: cumplido o no, sin opción intermedia.
+  cumplido       Boolean?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  weekly_plan WeeklyPlan @relation(fields: [weekly_plan_id], references: [id], onDelete: Cascade)
+  project     Project    @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@map("weekly_outcomes")
+}
+
+model Retro {
+  id             String   @id @default(cuid())
+  user_id        String
+  weekly_plan_id String   @unique
+  que_funciono   String?  @db.Text
+  que_no         String?  @db.Text
+  que_pruebo     String?  @db.Text
+  metricas       Json
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  weekly_plan WeeklyPlan @relation(fields: [weekly_plan_id], references: [id], onDelete: Cascade)
+
+  @@map("retros")
+}
+
+model Playbook {
+  id         String   @id @default(cuid())
+  user_id    String
+  version    Int      @unique
+  changelog  String   @db.Text
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  rules PlaybookRule[]
+
+  @@map("playbooks")
+}
+
+model PlaybookRule {
+  id              String    @id @default(cuid())
+  user_id         String
+  playbook_id     String
+  // R1..Rn
+  clave           String
+  texto           String    @db.Text
+  // foco | captura | ejecución | revisión
+  categoria       String
+  activa          Boolean   @default(true)
+  validacion_dura Boolean   @default(false)
+  parametros      Json?
+  retirada_el     DateTime?
+  motivo          String?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  playbook Playbook @relation(fields: [playbook_id], references: [id], onDelete: Cascade)
+
+  @@unique([playbook_id, clave])
+  @@map("playbook_rules")
+}
+
+model AdherenceMetric {
+  id            String   @id @default(cuid())
+  user_id       String
+  rule_key      String
+  semana_inicio DateTime @db.Date
+  numerador     Int
+  denominador   Int
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@unique([rule_key, semana_inicio])
+  @@map("adherence_metrics")
+}
+
+model ResearchIntent {
+  id                        String   @id @default(cuid())
+  user_id                   String
+  project_id                String
+  pregunta                  String   @db.Text
+  keywords                  String[]
+  justificacion             String   @db.Text
+  peso                      Float    @default(1.0)
+  activo                    Boolean  @default(true)
+  derivado_de_brief_version Int?
+  editado_manual            Boolean  @default(false)
+  created_at                DateTime @default(now())
+  updated_at                DateTime @updatedAt
+
+  project  Project   @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  findings Finding[]
+
+  @@map("research_intents")
+}
+
+model Source {
+  id           String     @id @default(cuid())
+  user_id      String
+  tipo         SourceTipo
+  handle       String?
+  url          String?
+  feed_url     String?
+  verticals    String[]
+  habilitada   Boolean    @default(true)
+  confianza    Float      @default(0.5)
+  ultimo_error String?
+  created_at   DateTime   @default(now())
+  updated_at   DateTime   @updatedAt
+
+  findings Finding[]
+
+  @@map("sources")
+}
+
+model Finding {
+  id                     String         @id @default(cuid())
+  user_id                String
+  project_id             String
+  intent_id              String?
+  source_id              String?
+  titulo                 String
+  url                    String
+  publicado_el           DateTime?
+  resumen_es             String         @db.Text
+  por_que_importa        String         @db.Text
+  accion_sugerida        AccionSugerida
+  titulo_tarea_propuesto String?
+  score_relevancia       Float
+  score_novedad          Float
+  score_accionabilidad   Float
+  estado                 FindingEstado  @default(nuevo)
+  motivo_descarte        String?
+  task_id                String?
+  created_at             DateTime       @default(now())
+  updated_at             DateTime       @updatedAt
+
+  project Project         @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  intent  ResearchIntent? @relation(fields: [intent_id], references: [id], onDelete: SetNull)
+  source  Source?         @relation(fields: [source_id], references: [id], onDelete: SetNull)
+  task    Task?           @relation(fields: [task_id], references: [id], onDelete: SetNull)
+
+  @@unique([project_id, url])
+  @@map("findings")
+}
+
+model DigestRun {
+  id             String   @id @default(cuid())
+  user_id        String
+  fecha          DateTime
+  estado         String
+  duracion_s     Float?
+  findings_count Int      @default(0)
+  coste_desglose Json
+  warnings       Json
+  traza          Json
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  @@map("digest_runs")
+}
+
+model Note {
+  id           String   @id @default(cuid())
+  user_id      String
+  project_id   String
+  titulo       String
+  contenido_md String   @db.Text
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@map("notes")
+}
+
+// Adenda 04: entidad propia para las decisiones abiertas.
+// Con diecisiete simultáneas y casi todas bloqueadas por alguien externo,
+// hay que poder ordenarlas, ver quién las bloquea y desde cuándo.
+model Decision {
+  id             String         @id @default(cuid())
+  user_id        String
+  project_id     String
+  titulo         String
+  // Opciones consideradas, como lista JSON de textos.
+  opciones       Json
+  // Texto libre: persona u organización que la bloquea.
+  bloqueado_por  String?
+  estado         DecisionEstado @default(abierta)
+  opcion_elegida String?
+  motivo         String?        @db.Text
+  abierta_desde  DateTime
+  cerrada_el     DateTime?
+  // Dato derivado: se calcula al cargar el seed y lo recalculará la
+  // lógica de decisiones cuando exista (ver DUDAS.md del encargo 2).
+  dias_abierta   Int            @default(0)
+  created_at     DateTime       @default(now())
+  updated_at     DateTime       @updatedAt
+
+  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@map("decisions")
+}
+
+// Adenda 05: hitos de proyectos de tipo entrega. No son tareas: agrupan
+// tareas y miden avance en proyectos con horizonte de meses. Se marcan
+// como completados a mano.
+model Milestone {
+  id            String    @id @default(cuid())
+  user_id       String
+  project_id    String
+  titulo        String
+  entregable    String    @db.Text
+  estimacion_h  Int
+  orden         Int
+  completado_el DateTime?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@map("milestones")
+}

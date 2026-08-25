@@ -1,0 +1,741 @@
+// Órbita — seed del encargo 2.
+// Carga los cinco proyectos reales con sus briefs literales de los
+// documentos 04 y 05, el playbook base con las reglas R1 a R6, las
+// diecisiete decisiones abiertas de Yajoma y Cribo, y los tres hitos
+// del proyecto Flujo de specs.
+//
+// El seed es destructivo: borra y recarga. Es una base de un solo
+// usuario y este comando existe para que la app nunca se vea vacía en
+// desarrollo.
+
+import { PrismaClient, Prisma } from "@prisma/client";
+import { hashContenido, parsearSecciones } from "../src/lib/brief";
+
+const prisma = new PrismaClient();
+
+// Usuario único. Las tablas llevan user_id desde el día uno para no
+// bloquear una futura versión multiusuario; la UI no lo expone.
+const USER_ID = "vluna";
+
+function diasDesde(fecha: Date, hasta: Date): number {
+  return Math.max(0, Math.floor((hasta.getTime() - fecha.getTime()) / 86_400_000));
+}
+
+// ---------- Briefs literales (documentos 04 y 05) ----------
+
+const BRIEF_YAJOMA = String.raw`## Contexto
+Panadería Yajoma es un grupo gallego de unos 50 empleados: obrador central en
+Sabarís (Baiona), tres tiendas y una cafetería, repartidos en tres sociedades
+(Yajoma Sabarís, El Buen Gusto y Panadería Yajoma Vigo). Orbia entra como capa
+de automatización, IA e inteligencia de negocio por encima de la implantación
+de Odoo que ejecuta Solvos. Encargo por horas: 700 €/mes, 20 h a 35 €/h, con
+presupuesto formal P-2026-0002 de 3.950 € + IVA vinculado a una subvención. Un
+organismo verifica la implantación de Odoo para concederla, y eso ordena las
+prioridades. El frente principal es la app de pedidos B2B, que sustituye los
+pedidos por WhatsApp de cafeterías, restaurantes y hoteles y genera hojas de
+producción por departamento. Nació como prototipo de Google AI Studio y se
+migró a repositorio propio en junio de 2026, rehaciendo autenticación y datos
+sobre Postgres. Hoy está en desarrollo avanzado: catálogo espejo de Odoo
+validado en development, producción desplegada pero todavía apuntando al Odoo
+de test.
+
+## Objetivos
+Del cliente: eliminar el pedido manual diario de Emilio, entre hora y media y
+dos horas cada noche, con pérdidas confirmadas cuando falta; y obtener hojas de
+producción por departamento. Éxito medible: los clientes piden en la app y la
+hoja de producción sale sola. Segundo objetivo, justificar la implantación de
+Odoo ante el organismo de la subvención, con implantación real, trazable y
+documentada. A medio plazo, aliviar a Alba con los albaranes y poder ver merma
+y rentabilidad por producto.
+
+Propio: entregar un producto en producción con repositorio y documentación
+legibles por terceros, facturar por horas y sostener la relación con Solvos
+como fuente de referidos.
+
+## Requerimientos
+- Catálogo espejo desde Odoo con altas, cambios y bajas automáticas —
+  [acordado], hecho (spec 014)
+- Filtro del catálogo por mapa categoría Odoo → departamento, editable en
+  admin; las categorías nuevas aparecen sin mapear — [acordado], spec 015 en
+  propuesta
+- Importar los 178 clientes de Odoo con ficha espejo y odooPartnerId —
+  [acordado], spec 016 en propuesta
+- Login por NIF en lugar de email, con el plugin username de better-auth —
+  [acordado] 24/08/2026
+- IVA desglosado en el total; precio igual al list_price de Odoo sin IVA —
+  [acordado]
+- Push de pedidos a Odoo como Sales Order en Yajoma Sabarís — [propuesto],
+  spec 017
+- Hojas de producción a partir de pedidos, no plan diario completo —
+  [acordado]
+- Expansión de pedidos recurrentes a pedidos con fecha — [acordado], sin
+  implementar
+- Sección de repartidor con listado de reparto, estados y ruta — [en discusión]
+- Go-live: reapuntar producción al Odoo real, resincronizar, admin real,
+  borrar usuarios de prueba — [acordado], pendiente
+- Transcripción IA de albaranes y facturas con evolk, integrada en Odoo —
+  [acordado], arranque previsto en septiembre
+- WhatsApp Cloud API sobre n8n — [acordado], configurado; su papel tras la app
+  queda [en discusión]
+- Merma, configurador de catering, dashboard de rentabilidad, horarios de
+  personal — [propuesto]
+
+## Stack
+React 19, TypeScript, Vite, Tailwind v4. Node/Express, Drizzle, PostgreSQL,
+better-auth, jsPDF. Railway con dos entornos aislados y auto-deploy; también
+n8n con primary, worker, Redis y Postgres. Odoo 19 Community vía JSON-RPC.
+GitHub en vluna-orbia/yajoma-b2b, con specs y ADRs. Desarrollo con Claude Code
+en VS Code. Proveedores: Railway, Solvos (Odoo y su hosting), Siscom (servidor
+y equipos), evolk (transcripción), CAICONTA (contabilidad).
+
+## Decisiones abiertas
+- Departamento por defecto de BOLLERIA: Obrador o Pastelería. Bloquea Yajoma:
+  falta criterio.
+- Cinco pares de clientes con NIF duplicado: fusionarlos o dar acceso solo a
+  uno. Bloquea Solvos (S-06). Con el NIF como usuario, un NIF repetido es un
+  usuario repetido.
+- Unidades de medida: dos artículos separados (B2B unidad, tienda kg) o una
+  sola UoM. Hoy todo va en Units. Bloquea Yajoma, no urge.
+- Aprobación de las specs 015 y 016, en estado propuesta. Bloquea revisión
+  propia.
+- Sección de reparto y cálculo de ruta: Google Maps limita a diez paradas. Se
+  barajó lista ordenada con ruta punto a punto. Bloquea: falta spec y falta
+  saber si entra en alcance.
+- Estados bidireccionales entre app y Odoo: sin decidir.
+- Multi-entidad: hoy los pedidos van a Sabarís. Falta definir si El Buen Gusto
+  y Vigo entran. Bloquea la configuración de compañías de Solvos.
+- Recetas: si existen y en qué formato. Bloquea sesión pendiente con Emilio y
+  definición de Lucía.
+- Reparto de responsabilidades entre evolk y Solvos en el flujo de albaranes.
+  Bloquea llamada Carlos–Antonio sin cerrar.
+- Papel del WhatsApp una vez viva la app: fallback con IA o retirada.
+
+## Riesgos
+- Las API keys de Odoo caducan sin aviso (S-14). Ya tumbaron el sync seis días
+  en julio. Dependemos de que alguien regenere la clave.
+- Cadena TLS incompleta en el servidor de Solvos (S-13). Se suple con un
+  certificado versionado que caduca por su cuenta; el día que expire, la
+  integración cae sola.
+- Borrado automático de catálogo: Odoo manda y lo ausente se borra. En julio
+  esto habría vaciado el catálogo entero al desaparecer una categoría.
+  Mitigado con cortacircuitos, pero el patrón sigue.
+- Producción apunta al Odoo de test y su espejo tiene odooId colgados.
+  Cualquier uso real antes del go-live daría datos falsos.
+- Odoo lo mueve Solvos, no nosotros: el calendario depende de una carga de
+  datos que no controlamos.
+- Solo 33 de 178 clientes tienen email y ninguno tiene portal. El alta de
+  accesos será trabajo manual de administración.
+- La subvención introduce un plazo externo. Si el organismo evalúa antes de
+  tiempo, la documentación pesa más que la funcionalidad.
+- Adopción de Emilio y de los clientes de hostelería. Si siguen escribiendo por
+  WhatsApp, el ahorro no se materializa.
+- Alcance abierto en contrato por horas. Con diez decisiones sin cerrar, el
+  proyecto puede alargarse sin cierre percibido por el cliente.
+- Cuenta personal de Facebook bloqueada para la verificación de identidad en
+  Meta: cualquier acción sensible sobre WhatsApp depende de una persona.`;
+
+const BRIEF_CRIBO = String.raw`## Contexto
+Cribo es un agente de IA que clasifica y asigna la documentación entrante,
+correo y adjuntos, en gestorías y despachos profesionales; genera tareas
+priorizadas por técnico y escala a revisión humana los casos dudosos. Es marca
+de producto independiente bajo Orbia Solutions. La contraparte es Tecsem,
+gestoría de Vigo: el gerente confirmó la colaboración y su ingeniero de
+sistemas se comprometió a construir APIs a medida sobre su ERP Ekon. El
+proyecto se formalizó al preparar la candidatura a startTIC (Zona Franca de
+Vigo, Cámara de Pontevedra, Gradiant), con incubación prevista del 10/09/2026
+al 10/03/2027 y 80% de presencialidad en Vigo. Fase actual: pre-piloto. La
+arquitectura está definida, el desarrollo para el dominio gestoría parte de
+cero, y el frente activo es la web de Cribo, con copy final aprobado y maqueta
+pendiente de revisión.
+
+## Objetivos
+Del cliente: reducir el tiempo dedicado al triaje manual del correo entrante y
+dar orden y trazabilidad a la asignación de trabajo. El criterio concreto de
+éxito con Tecsem no está pactado.
+
+Propio: validar el piloto como puerta previa a la constitución de sociedad, la
+financiación privada y la actividad comercial más amplia. Éxito: un piloto en
+producción con métricas de validación. Las métricas todavía no están definidas.
+
+## Requerimientos
+- Agente de triaje: clasificación por cliente, tipo (AEAT/TGSS, laboral,
+  contable-fiscal, consultas) y urgencia, con escalado humano — [acordado]
+- Panel propio de asignación de trabajo como salida por defecto — [acordado]
+- Buzón unificado por reenvío de correo en el entorno piloto — [acordado]
+- Capa de integración MCP para correo, gestión documental y ERP — [acordado]
+- Integración con Ekon vía las APIs de Tecsem, como implementación opcional a
+  medida — [acordado]
+- Web de Cribo: copy final cerrado, maqueta por fases, hero y entrada
+  unificada primero — [acordado]
+- OCR y extracción de datos estructurados fuera del alcance del MVP —
+  [acordado]
+- Ciberseguridad como requisito sustantivo, incluida mitigación de prompt
+  injection vía correo externo — [propuesto]
+- Registro de marca en clases 9 y 42 con agente de propiedad industrial —
+  [propuesto]
+- Becarios de FP de Montecastelo para desarrollo y etiquetado — [en discusión]
+- Modelo de negocio en tres capas: setup, suscripción, expansión —
+  [en discusión]
+
+## Stack
+Orquestación con LangGraph y LangChain. MCP como capa de integración. LLM open
+source (Llama, Mistral, Qwen) sobre infraestructura dedicada o local. Ekon en
+Tecsem; Odoo como experiencia previa de referencia. Hetzner identificado como
+mejor relación coste/valor para GPU en la UE durante el piloto, IONOS evaluado.
+El sistema previo del sector financiero, Avior, corre sobre Odoo, n8n y LLM en
+nube; n8n queda descartado para Cribo. Claude Design para la maqueta web,
+TMview para marcas, starttic.com para la candidatura.
+
+## Decisiones abiertas
+- Co-fundador de marketing: incorporarlo o seguir en solitario. Bloquea: no
+  entró en startTIC con proyecto propio y su implicación sigue sin resolverse.
+- Presupuesto: conviven 35.000–45.000 € en la candidatura y 45.000–55.000 € en
+  el informe inicial. Bloquea: seguro de responsabilidad civil con ciberriesgo
+  y soporte de ciberseguridad sin cotizar.
+- Infraestructura del piloto: GPU alquilada en la UE o máquina física en la
+  gestoría. Bloquea: coste mensual y que el programa no garantiza servidores
+  GPU a las incubadas.
+- Nombre de Tecsem en la web: nombrarlos o mantener "gestoría de Vigo".
+  Bloquea: falta permiso por escrito.
+- Dominio: cribo.es o cribo.app. Bloquea: comprobar disponibilidad.
+- Registro de marca. Bloquea: contratar agente de propiedad industrial y
+  redactar el listado de clases 9 y 42 a distancia de los vecinos crib*.
+- Becarios de Montecastelo. Bloquea: sin confirmar el centro.
+
+## Riesgos
+- Promotor único: concentra ejecución técnica y comercial en una persona. Es la
+  principal debilidad estructural declarada.
+- Piloto único: toda la validación depende de Tecsem. Si se cae, no hay segunda
+  referencia.
+- Prompt injection vía contenido de correo recibido del exterior. Riesgo
+  técnico real en un agente que lee correo no confiable.
+- Dependencia de un tercero para la integración: las APIs de Ekon las construye
+  personal de Tecsem, fuera de nuestro control de calendario.
+- Marca: vecinos próximos en la raíz crib* (criboos, CRIB, CRIBS). Riesgo
+  práctico bajo, pero presentarse sin agente lo eleva.
+- Web en presente de un producto no construido. Mitigado con el encuadre de
+  piloto con plazas limitadas, pero sigue siendo expectativa que gestionar.
+- Carga de la incubación: 80% de presencialidad en Vigo durante seis meses
+  compite con la actividad facturable de Orbia.`;
+
+const BRIEF_ORBIA = String.raw`## Contexto
+Orbia Solutions es la consultoría de automatización inteligente e IA para pymes
+que opera como autónomo desde Baiona/Vigo. Es la entidad que factura y la marca
+paraguas bajo la que viven los proyectos de cliente y Cribo como producto
+propio. Hoy la actividad facturable se concentra en Yajoma (700 €/mes) y la
+relación con Solvos funciona como canal de referidos sin comisión, a cambio de
+colaboración. El resto del tiempo va a Cribo y a la preparación de startTIC.
+
+## Objetivos
+Sostener la facturación mientras Cribo se valida, sin que la incubación se
+coma la actividad de cliente. Convertir la relación con Solvos en un canal
+estable de referidos. Definir una oferta empaquetada que no dependa de horas.
+
+## Requerimientos
+- Mantener la relación con Solvos activa y documentada — [acordado]
+- Presencia web de Orbia — [acordado], en marcha
+- Oferta de servicios empaquetada con precio, en lugar de por horas —
+  [propuesto]
+- Cartera de al menos un segundo cliente facturable antes de que arranque la
+  incubación — [propuesto]
+
+## Stack
+Claude Code, Railway, n8n, Odoo. Contabilidad con CAICONTA.
+
+## Decisiones abiertas
+- Modelo de contratación: seguir por horas o pasar a proyecto cerrado. Bloquea:
+  falta de datos propios sobre horas reales por tipo de encargo. Órbita debería
+  resolver esto en unos meses.
+- Constitución de sociedad: ligada a la validación del piloto de Cribo.
+- Reparto de dedicación entre actividad facturable y producto propio durante la
+  incubación. Bloquea: no hay medición.
+
+## Riesgos
+- Concentración de ingresos en un solo cliente.
+- La incubación de Cribo, con 80% de presencialidad durante seis meses,
+  compite directamente con la capacidad de facturar.
+- Contratación por horas con alcance abierto: dificulta prever ingresos y
+  cerrar proyectos.`;
+
+const BRIEF_ORBITA = String.raw`## Contexto
+Órbita es la herramienta que estás leyendo: sistema operativo personal de
+trabajo, de un solo usuario, construido para ordenar proyectos, sostener la
+ejecución y recibir investigación externa conectada a los requerimientos de
+cada proyecto. Se construye con un sistema de agentes a partir de la
+documentación en 00, 01, 02 y 03.
+
+## Objetivos
+Que las diecisiete decisiones abiertas repartidas entre Yajoma y Cribo estén
+visibles en un solo sitio, con quién las bloquea. Que ninguna semana pase sin
+un resultado comprometido por proyecto. Que el radar produzca al menos un
+hallazgo convertido en tarea por semana. Éxito: a las cuatro semanas, sigues
+usándola sin obligarte.
+
+## Requerimientos
+Los de la lista de alcance v1 del brief maestro.
+
+## Stack
+Next.js 15, Prisma, PostgreSQL, FastAPI, LangGraph, Railway. API key de
+Anthropic dedicada, aislada de la suscripción interactiva.
+
+## Decisiones abiertas
+- Si se construye entera antes del 10/09 o se recorta a un núcleo sin radar.
+- Si el anillo orbital merece el coste de implementación.
+
+## Riesgos
+- Es el cuarto proyecto activo cuando la regla propia dice tres.
+- Construir una herramienta de productividad es la forma más elegante de no
+  trabajar en lo que factura.
+- Si el radar produce ruido las dos primeras semanas, se abandona.`;
+
+const BRIEF_FLUJO_SPECS = String.raw`## Contexto
+Orbia trabaja hoy con un flujo de specs que existe solo dentro del repositorio
+de Yajoma: specs numeradas con criterios de aceptación, validación en
+development antes de promocionar a main, y ADRs para las decisiones. Funciona,
+pero no está escrito en ninguna parte, no se aplica a Cribo ni a la gestión del
+propio negocio, y no sobrevive a un cambio de proyecto. El repaso del máster de
+spec-driven development es el material de entrada para formalizarlo. El momento
+es ahora porque Cribo arranca el desarrollo del dominio gestoría desde cero el
+10/09/2026: es la única ocasión próxima de estrenar el flujo en un proyecto
+virgen en lugar de retro-encajarlo en uno en marcha.
+
+## Objetivos
+Tener un flujo de specs escrito, propio y aplicado a los tres proyectos de
+Orbia. Éxito: las primeras specs de Cribo se escriben con él sin consultar el
+máster, y una decisión de negocio de Orbia pasa por el mismo flujo que una
+decisión técnica. Objetivo secundario: que cada bloque de estudio produzca o una
+regla candidata para el Playbook o un ajuste concreto al flujo de Yajoma. Si un
+bloque no produce ninguna de las dos cosas, fue lectura, no trabajo.
+
+## Requerimientos
+- Plantilla de spec con secciones fijas y criterios de aceptación verificables
+  — [propuesto], hito 1
+- Definición de los estados de una spec y de qué se necesita para pasar de uno
+  a otro — [propuesto], hito 1
+- Plantilla de ADR alineada con la que ya se usa en Yajoma — [propuesto],
+  hito 1
+- Las cinco primeras specs de Cribo escritas con el flujo — [propuesto],
+  hito 2
+- Adaptación del flujo a decisiones que no son de software, para Orbia y para
+  la R6 del Playbook — [propuesto], hito 3
+- Retro-encaje de las specs 015, 016 y 017 de Yajoma al formato final —
+  [propuesto], hito 3
+
+## Stack
+Material del máster de spec-driven development. Markdown versionado en el
+repositorio de cada proyecto. Claude Code como consumidor final de las specs:
+el formato tiene que ser legible por un agente, no solo por una persona.
+
+## Decisiones abiertas
+- Dónde vive el flujo: repositorio propio, o duplicado en cada proyecto.
+  Bloquea: falta saber cuánto va a divergir entre software y negocio.
+- Si las specs de Cribo se escriben antes o después de cerrar la arquitectura
+  del piloto.
+- Qué nivel de detalle aguanta un proyecto no técnico sin que el flujo se
+  vuelva burocracia.
+
+## Riesgos
+- Que el repaso se convierta en consumo de material sin producir el flujo.
+  Mitigación: cada bloque termina con un artefacto o no cuenta.
+- Que el hito 2 se solape con el arranque de la incubación y se coma tiempo de
+  Cribo en lugar de ahorrarlo.
+- Que el flujo quede sobredimensionado para proyectos pequeños y se abandone.`;
+
+// ---------- Datos ----------
+
+const PROYECTOS = [
+  {
+    slug: "yajoma",
+    nombre: "Yajoma",
+    cliente: "Panadería Yajoma",
+    objetivo:
+      "Que los clientes pidan en la app y la hoja de producción salga sola, con la implantación de Odoo justificada ante el organismo de la subvención.",
+    color_acento: "#B99C4A",
+    orden: 1,
+    brief: BRIEF_YAJOMA,
+  },
+  {
+    slug: "cribo",
+    nombre: "Cribo",
+    cliente: null,
+    objetivo:
+      "Validar el piloto con Tecsem como puerta a la constitución de sociedad: un piloto en producción con métricas de validación.",
+    color_acento: "#5B6B73",
+    orden: 2,
+    brief: BRIEF_CRIBO,
+  },
+  {
+    slug: "orbia",
+    nombre: "Orbia",
+    cliente: null,
+    objetivo:
+      "Sostener la facturación mientras Cribo se valida y convertir la relación con Solvos en un canal estable de referidos.",
+    color_acento: "#C97B5A",
+    orden: 3,
+    brief: BRIEF_ORBIA,
+  },
+  {
+    slug: "orbita",
+    nombre: "Órbita",
+    cliente: null,
+    objetivo:
+      "Ver las diecisiete decisiones abiertas de Yajoma y Cribo en un solo sitio y que ninguna semana pase sin resultado comprometido por proyecto.",
+    color_acento: "#3D3A54",
+    orden: 4,
+    brief: BRIEF_ORBITA,
+  },
+  {
+    slug: "flujo-specs",
+    nombre: "Flujo de specs",
+    cliente: null,
+    objetivo:
+      "Tener un flujo de specs escrito, propio y aplicado a los tres proyectos de Orbia: las specs de Cribo se escriben con él sin consultar el máster.",
+    color_acento: "#5F7A5B",
+    orden: 5,
+    brief: BRIEF_FLUJO_SPECS,
+  },
+] as const;
+
+// Reglas del playbook. R1 a R5 con el texto literal del brief maestro;
+// R6 con el texto literal de la adenda 04.
+const REGLAS = [
+  {
+    clave: "R1",
+    texto: "Máximo 3 tareas en curso a la vez, contando todos los proyectos.",
+    categoria: "foco",
+    validacion_dura: true,
+    parametros: { limite: 3 },
+  },
+  {
+    clave: "R2",
+    texto: "Máximo 3 proyectos activos por semana.",
+    categoria: "foco",
+    validacion_dura: true,
+    parametros: { limite: 3 },
+  },
+  {
+    clave: "R3",
+    texto: "Toda sesión de trabajo se cierra escribiendo el siguiente paso.",
+    categoria: "ejecución",
+    validacion_dura: true,
+    parametros: null,
+  },
+  {
+    clave: "R4",
+    texto: "Todo lo que entra va al Inbox y no se procesa hasta el ritual semanal.",
+    categoria: "captura",
+    validacion_dura: false,
+    parametros: null,
+  },
+  {
+    clave: "R5",
+    texto: "Cada proyecto activo tiene un único resultado comprometido para la semana.",
+    categoria: "revisión",
+    validacion_dura: false,
+    parametros: null,
+  },
+  {
+    clave: "R6",
+    texto:
+      "Toda decisión con más de una opción viable se registra antes de ejecutarla, con las opciones consideradas y el motivo de la elegida.",
+    categoria: "ejecución",
+    validacion_dura: false,
+    // Validación asociada (adenda 04): una decisión abierta que lleve más
+    // de 21 días sin resolverse aparece en el brief diario. Métrica de
+    // adherencia: decisiones cerradas con motivo registrado sobre
+    // decisiones cerradas.
+    parametros: { dias_umbral: 21 },
+  },
+] as const;
+
+// Las diecisiete decisiones abiertas de Yajoma (10) y Cribo (7),
+// transcritas de las secciones "Decisiones abiertas" de sus briefs.
+// Las fechas de apertura son plausibles, no reales: los documentos no
+// las dan (ver DUDAS.md).
+const DECISIONES: {
+  proyecto: "yajoma" | "cribo";
+  titulo: string;
+  opciones: string[];
+  bloqueado_por: string | null;
+  abierta_desde: string;
+}[] = [
+  {
+    proyecto: "yajoma",
+    titulo: "Departamento por defecto de BOLLERIA",
+    opciones: ["Obrador", "Pastelería"],
+    bloqueado_por: "Yajoma: falta criterio",
+    abierta_desde: "2026-07-06",
+  },
+  {
+    proyecto: "yajoma",
+    titulo: "Cinco pares de clientes con NIF duplicado",
+    opciones: ["Fusionarlos", "Dar acceso solo a uno de cada par"],
+    bloqueado_por: "Solvos (S-06)",
+    abierta_desde: "2026-06-22",
+  },
+  {
+    proyecto: "yajoma",
+    titulo: "Unidades de medida de los artículos",
+    opciones: ["Dos artículos separados (B2B unidad, tienda kg)", "Una sola UoM"],
+    bloqueado_por: "Yajoma, no urge",
+    abierta_desde: "2026-06-15",
+  },
+  {
+    proyecto: "yajoma",
+    titulo: "Aprobación de las specs 015 y 016",
+    opciones: ["Aprobar como están", "Pedir cambios"],
+    bloqueado_por: "Revisión propia",
+    abierta_desde: "2026-08-13",
+  },
+  {
+    proyecto: "yajoma",
+    titulo: "Sección de reparto y cálculo de ruta",
+    opciones: [
+      "Ruta con Google Maps (límite de diez paradas)",
+      "Lista ordenada con ruta punto a punto",
+      "Fuera de alcance",
+    ],
+    bloqueado_por: "Falta spec y falta saber si entra en alcance",
+    abierta_desde: "2026-07-20",
+  },
+  {
+    proyecto: "yajoma",
+    titulo: "Estados bidireccionales entre app y Odoo",
+    opciones: ["Sincronización bidireccional", "Solo push hacia Odoo"],
+    bloqueado_por: null,
+    abierta_desde: "2026-07-28",
+  },
+  {
+    proyecto: "yajoma",
+    titulo: "Multi-entidad: si El Buen Gusto y Vigo entran",
+    opciones: ["Solo Yajoma Sabarís", "Las tres sociedades"],
+    bloqueado_por: "Solvos: configuración de compañías",
+    abierta_desde: "2026-06-30",
+  },
+  {
+    proyecto: "yajoma",
+    titulo: "Recetas: si existen y en qué formato",
+    opciones: ["Recetas en Odoo", "Formato propio", "No hay recetas utilizables"],
+    bloqueado_por: "Sesión pendiente con Emilio y definición de Lucía",
+    abierta_desde: "2026-07-10",
+  },
+  {
+    proyecto: "yajoma",
+    titulo: "Reparto de responsabilidades entre evolk y Solvos en los albaranes",
+    opciones: ["evolk extrae y Solvos integra", "evolk integra de punta a punta"],
+    bloqueado_por: "Llamada Carlos–Antonio sin cerrar",
+    abierta_desde: "2026-08-05",
+  },
+  {
+    proyecto: "yajoma",
+    titulo: "Papel del WhatsApp una vez viva la app",
+    opciones: ["Fallback con IA", "Retirada"],
+    bloqueado_por: null,
+    abierta_desde: "2026-08-01",
+  },
+  {
+    proyecto: "cribo",
+    titulo: "Co-fundador de marketing",
+    opciones: ["Incorporarlo", "Seguir en solitario"],
+    bloqueado_por: "Su implicación sigue sin resolverse",
+    abierta_desde: "2026-05-20",
+  },
+  {
+    proyecto: "cribo",
+    titulo: "Presupuesto del piloto",
+    opciones: ["35.000–45.000 € (candidatura)", "45.000–55.000 € (informe inicial)"],
+    bloqueado_por: "Seguro de RC con ciberriesgo y soporte de ciberseguridad sin cotizar",
+    abierta_desde: "2026-06-10",
+  },
+  {
+    proyecto: "cribo",
+    titulo: "Infraestructura del piloto",
+    opciones: ["GPU alquilada en la UE", "Máquina física en la gestoría"],
+    bloqueado_por: "Coste mensual sin cerrar; el programa no garantiza GPU",
+    abierta_desde: "2026-06-25",
+  },
+  {
+    proyecto: "cribo",
+    titulo: "Nombre de Tecsem en la web",
+    opciones: ["Nombrarlos", 'Mantener "gestoría de Vigo"'],
+    bloqueado_por: "Falta permiso por escrito de Tecsem",
+    abierta_desde: "2026-07-15",
+  },
+  {
+    proyecto: "cribo",
+    titulo: "Dominio: cribo.es o cribo.app",
+    opciones: ["cribo.es", "cribo.app"],
+    bloqueado_por: "Comprobar disponibilidad",
+    abierta_desde: "2026-08-03",
+  },
+  {
+    proyecto: "cribo",
+    titulo: "Registro de marca en clases 9 y 42",
+    opciones: ["Contratar agente de propiedad industrial", "Presentar sin agente"],
+    bloqueado_por: "Agente sin contratar y listado de clases sin redactar",
+    abierta_desde: "2026-07-01",
+  },
+  {
+    proyecto: "cribo",
+    titulo: "Becarios de FP de Montecastelo",
+    opciones: ["Incorporar becarios", "Seguir sin becarios"],
+    bloqueado_por: "Montecastelo sin confirmar",
+    abierta_desde: "2026-06-05",
+  },
+];
+
+// Hitos del proyecto Flujo de specs (adenda 05). Un hito se marca como
+// completado a mano; no son tareas.
+const HITOS = [
+  {
+    titulo: "Plantillas y estados del flujo",
+    entregable: "Plantillas de spec y ADR, estados y criterios de transición",
+    estimacion_h: 20,
+    orden: 1,
+  },
+  {
+    titulo: "Primeras specs de Cribo",
+    entregable: "Cinco primeras specs de Cribo escritas con el flujo",
+    estimacion_h: 30,
+    orden: 2,
+  },
+  {
+    titulo: "Flujo para decisiones de negocio",
+    entregable:
+      "Flujo adaptado a decisiones de negocio, R6 afinada, specs de Yajoma retro-encajadas",
+    estimacion_h: 30,
+    orden: 3,
+  },
+];
+
+// ---------- Carga ----------
+
+async function main() {
+  const ahora = new Date();
+
+  // Orden de borrado: hijos antes que padres.
+  await prisma.$transaction([
+    prisma.finding.deleteMany(),
+    prisma.researchIntent.deleteMany(),
+    prisma.source.deleteMany(),
+    prisma.digestRun.deleteMany(),
+    prisma.taskEvent.deleteMany(),
+    prisma.workSession.deleteMany(),
+    prisma.task.deleteMany(),
+    prisma.retro.deleteMany(),
+    prisma.weeklyOutcome.deleteMany(),
+    prisma.weeklyPlan.deleteMany(),
+    prisma.adherenceMetric.deleteMany(),
+    prisma.playbookRule.deleteMany(),
+    prisma.playbook.deleteMany(),
+    prisma.note.deleteMany(),
+    prisma.decision.deleteMany(),
+    prisma.milestone.deleteMany(),
+    prisma.projectBrief.deleteMany(),
+    prisma.project.deleteMany(),
+  ]);
+
+  // Proyectos con su brief versión 1.
+  const porSlug: Record<string, string> = {};
+  for (const p of PROYECTOS) {
+    const proyecto = await prisma.project.create({
+      data: {
+        user_id: USER_ID,
+        nombre: p.nombre,
+        cliente: p.cliente,
+        slug: p.slug,
+        objetivo: p.objetivo,
+        estado: "activo",
+        color_acento: p.color_acento,
+        orden: p.orden,
+        tipo: "entrega",
+        horas_objetivo: null,
+      },
+    });
+    porSlug[p.slug] = proyecto.id;
+    await prisma.projectBrief.create({
+      data: {
+        user_id: USER_ID,
+        project_id: proyecto.id,
+        version: 1,
+        contenido_md: p.brief,
+        content_hash: hashContenido(p.brief),
+        secciones: parsearSecciones(p.brief) as Prisma.InputJsonValue,
+      },
+    });
+  }
+
+  // Playbook base, versión 1, con las seis reglas.
+  const playbook = await prisma.playbook.create({
+    data: {
+      user_id: USER_ID,
+      version: 1,
+      changelog:
+        "Versión inicial: las cinco reglas base del brief maestro más la R6 de la adenda de datos reales.",
+    },
+  });
+  for (const r of REGLAS) {
+    await prisma.playbookRule.create({
+      data: {
+        user_id: USER_ID,
+        playbook_id: playbook.id,
+        clave: r.clave,
+        texto: r.texto,
+        categoria: r.categoria,
+        activa: true,
+        validacion_dura: r.validacion_dura,
+        parametros:
+          r.parametros === null
+            ? Prisma.JsonNull
+            : (r.parametros as unknown as Prisma.InputJsonValue),
+      },
+    });
+  }
+
+  // Las diecisiete decisiones abiertas de Yajoma y Cribo.
+  for (const d of DECISIONES) {
+    const abierta = new Date(d.abierta_desde + "T09:00:00+02:00");
+    await prisma.decision.create({
+      data: {
+        user_id: USER_ID,
+        project_id: porSlug[d.proyecto],
+        titulo: d.titulo,
+        opciones: d.opciones as unknown as Prisma.InputJsonValue,
+        bloqueado_por: d.bloqueado_por,
+        estado: "abierta",
+        abierta_desde: abierta,
+        dias_abierta: diasDesde(abierta, ahora),
+      },
+    });
+  }
+
+  // Los tres hitos de Flujo de specs.
+  for (const h of HITOS) {
+    await prisma.milestone.create({
+      data: {
+        user_id: USER_ID,
+        project_id: porSlug["flujo-specs"],
+        titulo: h.titulo,
+        entregable: h.entregable,
+        estimacion_h: h.estimacion_h,
+        orden: h.orden,
+      },
+    });
+  }
+
+  const resumen = {
+    proyectos: await prisma.project.count(),
+    briefs: await prisma.projectBrief.count(),
+    reglas: await prisma.playbookRule.count(),
+    decisiones: await prisma.decision.count(),
+    hitos: await prisma.milestone.count(),
+  };
+  console.log("Seed cargado:", JSON.stringify(resumen));
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(() => prisma.$disconnect());

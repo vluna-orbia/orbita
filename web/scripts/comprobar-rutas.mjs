@@ -21,11 +21,21 @@ const COOKIE = `orbita_sesion=${caducidad}.${firma}`;
 
 const RUTAS = [
   ["/hoy", ["Tres cosas hoy", "Órbita"]],
-  ["/proyectos", ["Proyectos", "anillo orbital"]],
+  ["/proyectos", ["Proyectos", "Nuevo proyecto", "Yajoma", "Archivados"]],
   ["/tareas", ["Tareas", "límite de tres en curso"]],
   ["/radar", ["Radar", "por qué te importa"]],
   ["/rituales", ["Rituales", "retrospectiva"]],
   ["/playbook", ["Playbook", "adherencia"]],
+];
+
+// Rutas del encargo 3: detalle de proyecto, brief y decisiones.
+const RUTAS_ENCARGO_3 = [
+  ["/proyectos/nuevo", ["Nuevo proyecto", "Objetivo", "Crear proyecto"]],
+  ["/proyectos/yajoma", ["Brief vivo", "Decisiones abiertas", "Departamento por defecto de BOLLERIA"]],
+  ["/proyectos/yajoma/brief", ["Brief vivo", "Guardar versión"]],
+  ["/proyectos/yajoma/versiones", ["Versiones del brief", "Comparar", "Versión 1"]],
+  ["/proyectos/yajoma/editar", ["Editar proyecto", "Guardar cambios"]],
+  ["/proyectos?filtro=archivados", ["Archivados", "No hay proyectos archivados"]],
 ];
 
 let fallos = 0;
@@ -94,7 +104,30 @@ for (const [ruta, esperados] of RUTAS) {
   }
 }
 
-// 6. La raíz lleva a /hoy (con sesión).
+// 6. Rutas del encargo 3, con sesión.
+for (const [ruta, esperados] of RUTAS_ENCARGO_3) {
+  const res = await fetch(BASE + ruta, { headers: { cookie: COOKIE } });
+  const html = await res.text();
+  if (res.status !== 200) {
+    mal(`con sesión, ${ruta}`, `status ${res.status}`);
+    continue;
+  }
+  const faltan = esperados.filter((t) => !html.includes(t));
+  if (faltan.length === 0) {
+    ok(`con sesión, ${ruta} muestra su contenido`);
+  } else {
+    mal(`con sesión, ${ruta}`, `faltan: ${faltan.join(", ")}`);
+  }
+}
+
+// 7. Un slug inexistente responde 404.
+{
+  const res = await fetch(BASE + "/proyectos/no-existe", { headers: { cookie: COOKIE } });
+  if (res.status === 404) ok("un proyecto inexistente responde 404");
+  else mal("proyecto inexistente", `status ${res.status}`);
+}
+
+// 8. La raíz lleva a /hoy (con sesión).
 {
   const res = await fetch(BASE + "/", { redirect: "manual", headers: { cookie: COOKIE } });
   const destino = res.headers.get("location") ?? "";

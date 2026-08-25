@@ -10,6 +10,7 @@
 
 import { PrismaClient, Prisma } from "@prisma/client";
 import { hashContenido, parsearSecciones } from "../src/lib/brief";
+import { inicioDeSemana, instanteInicioDeSemana } from "../src/lib/semana";
 
 const prisma = new PrismaClient();
 
@@ -608,6 +609,62 @@ const HITOS = [
   },
 ];
 
+// Plan semanal mínimo (encargo 3): la semana en curso con los dos
+// resultados comprometidos que declara la adenda 04 y las tareas de
+// semana justas para que el anillo orbital tenga base de cálculo. El
+// ritual completo llega con el encargo 5 y el seed de tareas rico (H8.2)
+// con el encargo 4 (ver DUDAS.md).
+const RESULTADOS_SEMANA = [
+  {
+    proyecto: "yajoma",
+    descripcion: "Specs 015 y 016 aprobadas y la 015 implementada en development.",
+  },
+  {
+    proyecto: "cribo",
+    descripcion: "Maqueta del hero y la entrada unificada revisada y cerrada.",
+  },
+] as const;
+
+const TAREAS_SEMANA: {
+  proyecto: "yajoma" | "cribo";
+  titulo: string;
+  estado: "semana" | "hecha";
+  estimacion_min: number;
+  siguiente_paso?: string;
+}[] = [
+  {
+    proyecto: "yajoma",
+    titulo: "Revisar y aprobar las specs 015 y 016",
+    estado: "hecha",
+    estimacion_min: 60,
+  },
+  {
+    proyecto: "yajoma",
+    titulo: "Implementar la spec 015 en development",
+    estado: "semana",
+    estimacion_min: 180,
+    siguiente_paso: "Escribir la migración del mapa categoría a departamento",
+  },
+  {
+    proyecto: "yajoma",
+    titulo: "Preparar la resincronización del catálogo para el go-live",
+    estado: "semana",
+    estimacion_min: 120,
+  },
+  {
+    proyecto: "cribo",
+    titulo: "Revisar la maqueta del hero con el copy final",
+    estado: "hecha",
+    estimacion_min: 45,
+  },
+  {
+    proyecto: "cribo",
+    titulo: "Cerrar la entrada unificada de la web",
+    estado: "semana",
+    estimacion_min: 90,
+  },
+];
+
 // ---------- Carga ----------
 
 async function main() {
@@ -723,12 +780,55 @@ async function main() {
     });
   }
 
+  // El plan de la semana en curso con sus dos resultados comprometidos y
+  // las tareas mínimas del anillo (encargo 3).
+  const plan = await prisma.weeklyPlan.create({
+    data: {
+      user_id: USER_ID,
+      semana_inicio: inicioDeSemana(ahora),
+      proyectos_activos: RESULTADOS_SEMANA.map((r) => r.proyecto) as unknown as Prisma.InputJsonValue,
+      completado_paso: 4,
+    },
+  });
+  for (const r of RESULTADOS_SEMANA) {
+    await prisma.weeklyOutcome.create({
+      data: {
+        user_id: USER_ID,
+        weekly_plan_id: plan.id,
+        project_id: porSlug[r.proyecto],
+        descripcion: r.descripcion,
+        cumplido: null,
+      },
+    });
+  }
+  // Completadas dentro de la semana en curso, pase cuando pase el seed.
+  const completadaEl = new Date(
+    Math.max(instanteInicioDeSemana(ahora).getTime() + 3_600_000, ahora.getTime() - 3 * 3_600_000)
+  );
+  for (const t of TAREAS_SEMANA) {
+    await prisma.task.create({
+      data: {
+        user_id: USER_ID,
+        project_id: porSlug[t.proyecto],
+        titulo: t.titulo,
+        estado: t.estado,
+        estimacion_min: t.estimacion_min,
+        siguiente_paso: t.siguiente_paso ?? null,
+        origen: "manual",
+        completed_at: t.estado === "hecha" ? completadaEl : null,
+      },
+    });
+  }
+
   const resumen = {
     proyectos: await prisma.project.count(),
     briefs: await prisma.projectBrief.count(),
     reglas: await prisma.playbookRule.count(),
     decisiones: await prisma.decision.count(),
     hitos: await prisma.milestone.count(),
+    planes: await prisma.weeklyPlan.count(),
+    resultados: await prisma.weeklyOutcome.count(),
+    tareas: await prisma.task.count(),
   };
   console.log("Seed cargado:", JSON.stringify(resumen));
 }

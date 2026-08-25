@@ -1,35 +1,42 @@
-# DUDAS — Encargo 2
+# DUDAS
 
 Contradicciones, ambigüedades y decisiones que merecen revisión. Nada de
 esto se ha implementado más allá de lo que se indica.
+
+## Del encargo 2 (estado tras el encargo 3)
 
 1. **Cinco ramas frente a "sin lógica de negocio".** El encargo 2 dice
    "sin lógica de negocio todavía"; la adenda 05 dice "implementa las
    cinco ramas ahora" en la lógica de validación y métricas, que no
    existen aún. Resuelto con la opción conservadora: las cinco ramas son
    funciones puras en `web/src/lib/reglas-proyecto.ts`, con tests, sin
-   cablear a ninguna validación. Los encargos 3 a 5 deben consumir ese
-   módulo en lugar de reescribir los condicionales.
+   cablear a ninguna validación. **Actualización del encargo 3:** el
+   límite de activos consume `cuentaParaLimiteDeActivos` y el anillo
+   consume `cierreDelAnillo`. Los encargos 4 y 5 deben seguir consumiendo
+   este módulo.
 
-2. **Decision.dias_abierta es un dato derivado almacenado.** El documento
-   04 lo lista como campo, así que la columna existe y el seed la calcula
-   a fecha de carga. Nada la recalcula después. El encargo que construya
-   la lógica de decisiones tiene que decidir si se deriva al leer o se
-   recalcula con un job, y retirar una de las dos fuentes de verdad.
+2. **Decision.dias_abierta** — **resuelta en el encargo 3.** Mientras la
+   decisión está abierta, los días se calculan al leer desde
+   `abierta_desde` y la columna no se consulta; al cerrarla, el valor se
+   congela en la columna (días entre `abierta_desde` y `cerrada_el`) como
+   registro histórico. Una sola fuente de verdad por estado y sin job de
+   recálculo. El valor que el seed escribe en decisiones abiertas queda
+   como redundante e inofensivo: ningún código lo lee.
 
 3. **Fechas de apertura de las diecisiete decisiones.** Los documentos no
    dan fechas; el seed usa fechas plausibles entre mayo y agosto de 2026.
-   Con el umbral de 21 días de R6, la mayoría aparecería hoy como
-   bloqueada hace semanas. Si eso no refleja la realidad, corrige
-   `abierta_desde` en `web/prisma/seed.ts` antes del encargo de la
-   pantalla Hoy.
+   Con el umbral de 21 días de R6, la mayoría aparece hoy como bloqueada
+   hace semanas (ya visible en el listado de decisiones del encargo 3,
+   en ámbar). Si eso no refleja la realidad, corrige `abierta_desde` en
+   `web/prisma/seed.ts`.
 
-4. **Cinco proyectos activos con R2 en 3.** Los documentos declaran los
-   cinco en `activo` y el propio 04 reconoce el desbordamiento. El seed
-   los carga tal cual porque en este encargo no hay validación. El
-   encargo 3 (límite de activos en servidor) chocará con este estado
-   inicial: habrá que decidir si el seed pausa alguno o si la validación
-   solo aplica a cambios nuevos.
+4. **Cinco proyectos activos con R2 en 3** — **resuelta en el encargo 3.**
+   La validación del límite aplica solo a transiciones nuevas (crear y
+   activar); el estado inicial del seed no se toca porque los documentos
+   lo declaran así. Crear un proyecto con el cupo lleno lo deja en pausa
+   con aviso; activar uno con el cupo lleno se rechaza con aviso. Para
+   volver a estar dentro de R2 hay que pausar dos proyectos a mano o
+   esperar al ritual del encargo 5 (su paso 2 pausa el resto).
 
 5. **Categorías de las reglas sin asignar en ningún documento.**
    Asignadas: R1 foco, R2 foco, R3 ejecución, R4 captura, R5 revisión,
@@ -41,12 +48,12 @@ esto se ha implementado más allá de lo que se indica.
    `parametros.dias_umbral = 21`.
 
 7. **Alcance del seed.** El encargo 2 pide proyectos, briefs y playbook;
-   el usuario añadió decisiones e hitos. No se cargan tareas, sesiones,
-   planificaciones, resultados comprometidos, intents ni hallazgos (los
-   resultados comprometidos que el 04 declara para Yajoma y Cribo
-   pertenecen a una semana concreta y entran con los rituales). H8.2
-   describe un seed más rico: se completará en los encargos que
-   construyan esas entidades.
+   el usuario añadió decisiones e hitos. **Actualización del encargo 3:**
+   se añade, a petición del usuario, un plan semanal mínimo de la semana
+   en curso con los dos resultados comprometidos que declara la adenda 04
+   (Yajoma y Cribo) y cinco tareas de semana (dos hechas), para que el
+   anillo orbital tenga base de cálculo. El seed rico de H8.2 (30 tareas,
+   sesiones, retro, hallazgos) llega con los encargos 4 a 7.
 
 8. **"Capturar" en la barra móvil** apunta a /tareas hasta que exista la
    captura con la tecla c (encargo 4).
@@ -54,9 +61,8 @@ esto se ha implementado más allá de lo que se indica.
 9. **Prisma fijado a 6.x y TypeScript a 5.x.** Prisma 7 elimina `url` en
    el datasource y cambia el flujo de configuración a `prisma.config.ts`
    con adapters; TypeScript 7 es la reescritura en Go y Next 15 no la
-   soporta oficialmente. El stack del brief no fija versión, así que se
-   usan las líneas estables del flujo clásico. Subir de versión es un
-   encargo propio, no un efecto colateral.
+   soporta oficialmente. Subir de versión es un encargo propio, no un
+   efecto colateral.
 
 10. **No hay cierre de sesión.** H8.1 no lo pide: usuario único y sesión
     de 30 días. Si se quiere, es un botón que borra la cookie.
@@ -71,7 +77,67 @@ esto se ha implementado más allá de lo que se indica.
     así queda anclado en el lockfile; el pipeline llega con el encargo 6.
 
 14. **Railway con token de proyecto.** Decisión del usuario para aislar
-    sus proyectos en producción. `railway add` debería poder crear la
-    base y los servicios dentro del proyecto del token; si Railway lo
-    rechaza por permisos, esos recursos se crean a mano en el panel
-    (documentado en la skill de despliegue).
+    sus proyectos en producción. Documentado en la skill de despliegue.
+
+## Del encargo 3
+
+15. **Decisiones: solo listado de abiertas y cierre.** El encargo pide el
+    listado por proyecto y el cierre con opción y motivo. No hay alta ni
+    edición de decisiones desde la interfaz, ni vista de cerradas, ni
+    gestión del estado `caducada` (el enum existe y nada lo usa aún). Si
+    hace falta, es una historia nueva.
+
+16. **La opción elegida tiene que ser una de las consideradas.** Es la
+    lectura literal de "registrando la opción elegida". Si al cerrar de
+    verdad gana una opción que no estaba en la lista, hoy no se puede: se
+    documenta como límite. Alternativa descartada: campo libre.
+
+17. **Botón "Regenerar intents" deshabilitado.** H1.2 pide el aviso "El
+    brief cambió desde la última derivación de intents" con un botón para
+    regenerarlos. El aviso funciona (compara hashes contra los intents
+    activos); el botón existe y explica que la derivación llega con el
+    motor del encargo 6. Sin intents en el seed, el aviso no aparece en
+    la interfaz: lo cubren los tests de integración.
+
+18. **Project.tipo y horas_objetivo sin interfaz.** Ninguna historia del
+    encargo los pide en formularios. Los proyectos nuevos nacen como
+    `entrega`. La lógica de continuo (anillo por horas, límite que no
+    consume plaza) está implementada en el servicio por venir de la
+    adenda 05, pero no hay forma de crear un proyecto continuo desde la
+    interfaz.
+
+19. **El límite de R2 se lee del playbook.** `parametros.limite` de la
+    regla R2 activa, con 3 por defecto; si la regla está desactivada no
+    hay validación. Anticipa el interruptor de H5.1 sin construir su
+    interfaz. Lo mismo con el umbral de 21 días de R6 para destacar
+    decisiones en ámbar.
+
+20. **Tareas del seed sin eventos de transición.** Las cinco tareas del
+    plan semanal no llevan TaskEvent: la máquina de estados con su log es
+    del encargo 4. Quien construya H2.2 decide si retro-genera eventos de
+    creación para el seed.
+
+21. **`WeeklyPlan.proyectos_activos` guarda slugs** (`["yajoma","cribo"]`),
+    los dos proyectos con resultado comprometido declarado en la adenda
+    04. El ritual del encargo 5 fijará el formato definitivo y la
+    coherencia con R2 (hoy hay cinco activos y un plan con dos).
+
+22. **El brief se muestra como texto preformateado,** no como markdown
+    renderizado. Ningún criterio pide fidelidad de render y el contenido
+    son listas y párrafos que se leen bien tal cual. Si se quiere render
+    completo, es una mejora aparte.
+
+23. **La comparación de versiones usa un diff propio** (subsecuencia
+    común más larga, por líneas) en `web/src/lib/diff.ts`, para no añadir
+    dependencias. Suficiente para briefs; no calcula diffs dentro de una
+    línea.
+
+24. **Guardar el brief sin cambios reales no crea versión** (el hash
+    normalizado coincide) y se avisa "sin cambios". H1.2 dice "cuando
+    guardo, se crea una versión nueva": se interpreta que guardar lo
+    mismo no debe duplicar versiones, coherente con el criterio del hash
+    del encargo.
+
+25. **Editar un proyecto no cambia su slug.** Las URLs y el engine
+    dependen de él; renombrar cambia el nombre visible y conserva el
+    slug.

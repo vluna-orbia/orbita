@@ -407,8 +407,11 @@ model Decision {
   motivo         String?        @db.Text
   abierta_desde  DateTime
   cerrada_el     DateTime?
-  // Dato derivado: se calcula al cargar el seed y lo recalculará la
-  // lógica de decisiones cuando exista (ver DUDAS.md del encargo 2).
+  // Dato derivado (DUDA 2 del encargo 2, resuelta en el 3): mientras la
+  // decisión está abierta, los días se calculan al leer desde
+  // abierta_desde y esta columna no se consulta; al cerrarla, el valor se
+  // congela aquí como registro histórico (días entre abierta_desde y
+  // cerrada_el). Una sola fuente de verdad por estado, sin job.
   dias_abierta   Int            @default(0)
   created_at     DateTime       @default(now())
   updated_at     DateTime       @updatedAt

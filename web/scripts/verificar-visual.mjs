@@ -13,7 +13,21 @@ const BASE = process.argv[2] ?? "http://localhost:3100";
 const DIR = process.argv[3] ?? "/tmp/capturas";
 const CONTRASENA = process.env.ORBITA_PASSWORD ?? "orbita-local";
 
-const RUTAS = ["/hoy", "/proyectos", "/tareas", "/radar", "/rituales", "/playbook"];
+const RUTAS = [
+  "/hoy",
+  "/proyectos",
+  "/proyectos/nuevo",
+  "/proyectos/yajoma",
+  "/proyectos/yajoma/brief",
+  "/proyectos/yajoma/versiones",
+  "/proyectos/yajoma/editar",
+  "/tareas",
+  "/radar",
+  "/rituales",
+  "/playbook",
+];
+
+const nombreCaptura = (ruta) => ruta.slice(1).replace(/\//g, "-");
 
 await mkdir(DIR, { recursive: true });
 
@@ -48,10 +62,22 @@ async function recorrer(nombre, viewport) {
       problemas.push(`[${nombre}] desbordamiento horizontal en ${ruta}`);
     }
     await pagina.screenshot({
-      path: `${DIR}/${ruta.slice(1)}-${nombre}.png`,
+      path: `${DIR}/${nombreCaptura(ruta)}-${nombre}.png`,
       fullPage: true,
     });
   }
+
+  // El formulario de cierre de una decisión se abre en la propia fila.
+  await pagina.goto(BASE + "/proyectos/yajoma", { waitUntil: "networkidle" });
+  await pagina.getByRole("button", { name: "Cerrar decisión" }).first().click();
+  await pagina.getByText("Motivo de la elección").waitFor({ timeout: 5000 });
+  const desbordamientoCierre = await pagina.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth
+  );
+  if (desbordamientoCierre) {
+    problemas.push(`[${nombre}] desbordamiento horizontal con el cierre de decisión abierto`);
+  }
+  await pagina.screenshot({ path: `${DIR}/decision-cierre-${nombre}.png`, fullPage: true });
 
   // Contraseña incorrecta: mensaje de error sin romper nada.
   if (nombre === "375") {
@@ -79,7 +105,7 @@ await recorrer("1440", { width: 1440, height: 900 });
 await navegador.close();
 
 if (problemas.length === 0) {
-  console.log("Verificación visual limpia: login real, seis rutas en dos tamaños, consola sin errores.");
+  console.log("Verificación visual limpia: login real, todas las rutas en dos tamaños, consola sin errores.");
   process.exit(0);
 }
 console.log(`${problemas.length} problemas:`);

@@ -106,3 +106,50 @@ export function rangoDeAyer(ahora: Date = new Date()): { inicio: Date; fin: Date
     fin: instanteMedianocheMadrid(hoy),
   };
 }
+
+// Día civil del instante en Madrid, como fecha pura a medianoche UTC.
+// Mismo convenio que inicioDeSemana: es el valor que guarda un @db.Date
+// (lo usa el posponer del aviso de ritual, H4.3).
+export function fechaCivilPura(instante: Date = new Date()): Date {
+  const civil = fechaCivilMadrid(instante);
+  return new Date(Date.UTC(civil.anio, civil.mes - 1, civil.dia));
+}
+
+// Día de la semana civil en Madrid: 0 = lunes ... 6 = domingo. Decide
+// cuándo toca el aviso de ritual pendiente (lunes plan, viernes retro).
+export function diaDeLaSemana(instante: Date = new Date()): number {
+  const civil = fechaCivilMadrid(instante);
+  const fecha = new Date(Date.UTC(civil.anio, civil.mes - 1, civil.dia));
+  return (fecha.getUTCDay() + 6) % 7;
+}
+
+// Los lunes de las últimas n semanas (fechas puras, como semana_inicio),
+// de la más antigua a la de la semana en curso incluida.
+export function ultimasSemanas(n: number, ahora: Date = new Date()): Date[] {
+  const actual = inicioDeSemana(ahora);
+  const semanas: Date[] = [];
+  for (let i = n - 1; i >= 0; i--) {
+    semanas.push(
+      new Date(
+        Date.UTC(actual.getUTCFullYear(), actual.getUTCMonth(), actual.getUTCDate() - i * 7)
+      )
+    );
+  }
+  return semanas;
+}
+
+// Rango [inicio, fin) en instantes reales de la semana cuyo lunes es la
+// fecha pura dada: de la medianoche de Madrid de ese lunes a la del lunes
+// siguiente, con los cambios de hora absorbidos. Es el rango con el que
+// se calculan las métricas de adherencia (H5.3).
+export function rangoDeSemanaPura(lunes: Date): { inicio: Date; fin: Date } {
+  const civil = {
+    anio: lunes.getUTCFullYear(),
+    mes: lunes.getUTCMonth() + 1,
+    dia: lunes.getUTCDate(),
+  };
+  return {
+    inicio: instanteMedianocheMadrid(civil),
+    fin: instanteMedianocheMadrid(sumarDias(civil, 7)),
+  };
+}

@@ -67,13 +67,13 @@ describe("seed del encargo 2", () => {
     expect(r1?.validacion_dura).toBe(true);
   });
 
-  it("hay diecisiete decisiones abiertas: diez de Yajoma y siete de Cribo", async () => {
+  it("hay diecisiete decisiones abiertas (diez de Yajoma, siete de Cribo) y tres cerradas", async () => {
     const decisiones = await db.decision.findMany({ include: { project: true } });
-    expect(decisiones).toHaveLength(17);
+    const abiertas = decisiones.filter((d) => d.estado === "abierta");
+    expect(abiertas).toHaveLength(17);
     const porProyecto = new Map<string, number>();
-    for (const d of decisiones) {
+    for (const d of abiertas) {
       porProyecto.set(d.project.slug, (porProyecto.get(d.project.slug) ?? 0) + 1);
-      expect(d.estado).toBe("abierta");
       expect(d.cerrada_el).toBeNull();
       expect(Array.isArray(d.opciones)).toBe(true);
       expect((d.opciones as string[]).length).toBeGreaterThanOrEqual(2);
@@ -82,6 +82,15 @@ describe("seed del encargo 2", () => {
     }
     expect(porProyecto.get("yajoma")).toBe(10);
     expect(porProyecto.get("cribo")).toBe(7);
+
+    // Encargo 5: tres cerradas para la métrica de R6, dos con motivo.
+    const cerradas = decisiones.filter((d) => d.estado === "cerrada");
+    expect(cerradas).toHaveLength(3);
+    for (const d of cerradas) {
+      expect(d.cerrada_el).not.toBeNull();
+      expect(d.opcion_elegida).toBeTruthy();
+    }
+    expect(cerradas.filter((d) => d.motivo).length).toBe(2);
   });
 
   it("Flujo de specs tiene tres hitos ordenados que suman 80 horas", async () => {

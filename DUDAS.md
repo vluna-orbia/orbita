@@ -45,7 +45,12 @@ esto se ha implementado más allá de lo que se indica.
 6. **validacion_dura sin especificar por regla.** Dura en R1, R2 y R3
    (el brief maestro las describe como impedimento técnico); blanda en
    R4, R5 y R6 (avisos y métricas). R6 guarda su umbral en
-   `parametros.dias_umbral = 21`.
+   `parametros.dias_umbral = 21`. **Actualización del encargo 5,
+   confirmada por el usuario en el plan:** el bloqueo del paso 1 del
+   ritual (no avanzar con el inbox sin vaciar) es una regla del flujo
+   del asistente que fija H4.1, no la validación de R4. R4 blanda
+   gobierna fuera del ritual (la app no impide procesar el inbox otro
+   día; la métrica lo mide) y desactivar R4 no relaja el paso 1.
 
 7. **Alcance del seed.** El encargo 2 pide proyectos, briefs y playbook;
    el usuario añadió decisiones e hitos. **Actualización del encargo 3:**
@@ -127,6 +132,10 @@ esto se ha implementado más allá de lo que se indica.
     los dos proyectos con resultado comprometido declarado en la adenda
     04. El ritual del encargo 5 fijará el formato definitivo y la
     coherencia con R2 (hoy hay cinco activos y un plan con dos).
+    **Resuelta en el encargo 5:** el formato definitivo son slugs (son
+    estables, DUDA 25), en el orden de los proyectos. La coherencia con
+    R2 la impone el paso 2 del ritual: guarda la selección validando el
+    límite y pausa el resto en la misma transacción.
 
 22. **El brief se muestra como texto preformateado,** no como markdown
     renderizado. Ningún criterio pide fidelidad de render y el contenido
@@ -286,3 +295,83 @@ esto se ha implementado más allá de lo que se indica.
     uno; el usuario sustituye los adjuntos del agente constructor y los
     del proyecto de diseño. El repositorio sigue guardando solo código,
     ENTREGA.md y este fichero.
+
+## Del encargo 5 (rituales y Playbook)
+
+46. **El "job semanal" de H5.3 es un cálculo perezoso e idempotente,**
+    no un cron: al leer la ficha de una regla, las semanas cerradas sin
+    fila se calculan y materializan en `adherence_metrics` una sola vez;
+    la semana en curso se calcula al vuelo y no se persiste hasta que
+    cierra. Mismo patrón que las sesiones huérfanas (DUDA 27). Una
+    semana materializada es una foto: editar datos pasados (escribir la
+    nota de una abandonada, cerrar una decisión con fecha vieja) no la
+    recalcula, igual que no la recalcularía un cron que ya corrió.
+
+47. **Las métricas miden contra el parámetro vigente de la última
+    versión** (`limite` de R2, `dias_umbral` de R6), también en semanas
+    pasadas: no se reconstruye el histórico del parámetro semana a
+    semana. El interruptor gobierna la validación, no la medición: una
+    regla desactivada conserva su ficha y sus barras.
+
+48. **R2 se evalúa contra la planificación de cada semana** (la cuenta
+    de `proyectos_activos` del plan): una semana sin plan queda sin
+    dato, no como incumplimiento. R5 queda sin dato hasta que la
+    retrospectiva verifica los resultados: sin retro nadie los ha
+    contado.
+
+49. **Los cocientes de R1 y R4 pueden cruzar semanas o superar el 100%.**
+    En R4 el triaje del lunes procesa capturas de la semana anterior
+    (numerador y denominador de semanas distintas); en R1 puede haber
+    más rechazos que transiciones. Se muestran tal cual los define
+    H5.3 (la fracción cruda en la ficha); la barra se recorta a 100 y
+    la de R1 se pinta invertida (100 = ningún intento), para que las
+    seis barras se lean igual: más alto, mejor.
+
+50. **En el triaje del ritual, backlog o semana exigen proyecto.**
+    Lectura literal de H4.1 ("cada elemento va a un proyecto y a
+    backlog o semana, o se descarta"); descartar no lo pide. Fuera del
+    ritual, la vista de tareas sigue permitiendo triar sin proyecto
+    (H2.1: el proyecto nunca es obligatorio en la captura).
+
+51. **El paso 2 no impone mínimo de proyectos activos.** "Elegir hasta
+    3" fija techo, no suelo. Con R2 desactivada no hay tope; los
+    continuos se eligen sin consumir plaza (módulo reglas-proyecto,
+    DUDA 1). Al guardar, los elegidos pasan a activos y el resto de los
+    no archivados a pausa, en la misma transacción.
+
+52. **Editar el plan puede retirar resultados comprometidos.** Si en
+    modo edición un proyecto sale del plan, su resultado (y el cumplido
+    que tuviera) se borra con él; los que siguen conservan la
+    descripción editada y el cumplido marcado. El plan representa el
+    compromiso vigente de la semana, no un histórico de compromisos.
+
+53. **Reglas propias: solo ellas se retiran; las base se desactivan.**
+    Nacen activas, sin validación (`validacion_dura` false, sin
+    parámetros), con clave R7 en adelante (las claves no se
+    reutilizan). Como recordatorios aparecen en el ritual de su
+    categoría: captura en el paso 1, foco en el paso 2, ejecución en el
+    paso 4 y revisión en la retrospectiva. "Qué cambio pruebo" se
+    convierte en regla de categoría revisión (nace del ritual de
+    revisión y se evalúa en la retro siguiente).
+
+54. **El motivo de cada versión existe siempre (H5.2):** si el usuario
+    no lo escribe, se genera uno automático ("Regla R4 desactivada",
+    "Regla R7 añadida"). El interruptor no pide motivo para no poner
+    fricción a un gesto de un clic.
+
+55. **Posponer el aviso de ritual (H4.3) silencia el día civil en
+    curso** (tabla `ritual_snoozes`, una fila por tipo y fecha). El
+    lunes el resto de Hoy se atenúa (opacidad al 40%) sin bloquear la
+    interacción; el viernes se avisa solo si el plan está completo y
+    falta la retro: sin plan no hay nada que retrospectivar y el aviso
+    que tocaba era el del lunes.
+
+56. **Datos nuevos del seed para las barras y la retro.** Plan y retro
+    completos de la semana pasada (métricas calculadas de los datos
+    sembrados al correr el seed, no inventadas), un plan de hace dos
+    semanas con cuatro activos (la semana que R2 no se cumplió), dos
+    triajes de ritual del lunes pasado, sesiones y rechazos en las
+    semanas -2 a -4 y tres decisiones cerradas (dos con motivo, una sin
+    él, cerrada antes de existir la regla). La abandonada antigua lleva
+    la nota ya escrita: una abandonada sin nota dispararía el modal de
+    nota pendiente en cada pantalla (H3.3).

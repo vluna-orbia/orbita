@@ -5,14 +5,51 @@
 // quién las bloquea. Una sección sin contenido se omite por completo.
 // Hallazgos y resultados comprometidos llegan con la pantalla completa
 // del encargo 7.
+//
+// Encargo 5 (H4.3): el lunes sin planificación, el aviso va en cabecera
+// y el resto queda atenuado hasta hacerla o posponerla explícitamente;
+// el viernes con la retro pendiente, el mismo aviso sin atenuar.
 
+import Link from "next/link";
 import { DecisionesHoy } from "@/components/decisiones-hoy";
 import { FilaTarea } from "@/components/fila-tarea";
 import { NotasDeAyer } from "@/components/notas-de-ayer";
 import { SesionHoy } from "@/components/sesion-hoy";
+import { Button } from "@/components/ui/button";
+import { posponerRitualAction } from "@/app/(app)/rituales/acciones";
 import { prisma } from "@/lib/prisma";
 import { decisionesSobreUmbral, notasDeAyer, tareasEnCursoDeHoy } from "@/lib/servicio-hoy";
+import { avisoDeRitual, type AvisoDeRitual } from "@/lib/servicio-rituales";
 import { sesionActiva } from "@/lib/servicio-sesiones";
+
+function AvisoRitualPendiente({ aviso }: { aviso: AvisoDeRitual }) {
+  const esPlan = aviso.tipo === "plan";
+  return (
+    <div
+      role="status"
+      className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-coral-velo px-4 py-3"
+    >
+      <p className="text-[0.9375rem] leading-[1.6] text-tinta">
+        {esPlan
+          ? "Es lunes y la semana está sin planificar. Quince minutos y queda montada."
+          : "Es viernes y la retrospectiva de la semana sigue pendiente."}
+      </p>
+      <div className="flex shrink-0 gap-2">
+        <Button asChild size="sm">
+          <Link href={esPlan ? "/rituales/planificacion" : "/rituales/retrospectiva"}>
+            {esPlan ? "Hacer la planificación" : "Hacer la retrospectiva"}
+          </Link>
+        </Button>
+        <form action={posponerRitualAction}>
+          <input type="hidden" name="tipo" value={aviso.tipo} />
+          <Button type="submit" variant="ghost" size="sm">
+            Posponer hasta mañana
+          </Button>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 // El brief diario se compone con la fecha del momento, no con la del build.
 export const dynamic = "force-dynamic";
@@ -30,21 +67,26 @@ function fechaDeHoy(): string {
 }
 
 export default async function Hoy() {
-  const [tareas, sesion, notas, decisiones] = await Promise.all([
+  const [tareas, sesion, notas, decisiones, aviso] = await Promise.all([
     tareasEnCursoDeHoy(prisma),
     sesionActiva(prisma),
     notasDeAyer(prisma),
     decisionesSobreUmbral(prisma),
+    avisoDeRitual(prisma),
   ]);
 
   const sinNada =
     tareas.length === 0 && notas.length === 0 && (decisiones?.decisiones.length ?? 0) === 0;
+  const atenuado = aviso?.atenuar ?? false;
 
   return (
     <>
       <p className="t-micro text-tinta-tenue">{fechaDeHoy()}</p>
       <h1 className="mt-2 font-serif text-[2rem] leading-[1.15]">Tres cosas hoy</h1>
 
+      {aviso ? <AvisoRitualPendiente aviso={aviso} /> : null}
+
+      <div className={atenuado ? "opacity-40" : undefined}>
       {tareas.length > 0 ? (
         <section className="mt-8" aria-label="Tareas en curso">
           <h2 className="text-[1.25rem] font-semibold leading-[1.3]">En curso</h2>
@@ -85,6 +127,7 @@ export default async function Hoy() {
           empieza una sesión.
         </p>
       ) : null}
+      </div>
     </>
   );
 }

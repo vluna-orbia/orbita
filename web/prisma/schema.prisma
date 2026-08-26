@@ -163,12 +163,32 @@ model TaskEvent {
   // Nulo en el evento de creación.
   estado_anterior String?
   estado_nuevo    String
+  // Encargo 5: true cuando la transición se hizo desde el paso 1 del
+  // ritual semanal. Es el numerador de la métrica de adherencia de R4
+  // (elementos del inbox procesados en el ritual / total capturados).
+  via_ritual      Boolean  @default(false)
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
   task Task @relation(fields: [task_id], references: [id], onDelete: Cascade)
 
   @@map("task_events")
+}
+
+// Encargo 5 (H4.3): posponer explícitamente el aviso de ritual pendiente.
+// Una fila por tipo y día civil (fecha pura, como semana_inicio): posponer
+// silencia el aviso hasta el día siguiente.
+model RitualSnooze {
+  id         String   @id @default(cuid())
+  user_id    String
+  // plan | retro
+  tipo       String
+  fecha      DateTime @db.Date
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@unique([tipo, fecha])
+  @@map("ritual_snoozes")
 }
 
 // Rechazos por límite de WIP (encargo 4b). Cada intento de poner una

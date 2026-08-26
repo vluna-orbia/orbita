@@ -11,6 +11,7 @@
 import { PrismaClient, Prisma } from "@prisma/client";
 import { hashContenido, parsearSecciones } from "../src/lib/brief";
 import { inicioDeSemana, instanteInicioDeSemana, rangoDeAyer } from "../src/lib/semana";
+import { metricasDeLaSemana } from "../src/lib/servicio-rituales";
 
 const prisma = new PrismaClient();
 
@@ -911,6 +912,7 @@ async function main() {
     prisma.weeklyOutcome.deleteMany(),
     prisma.weeklyPlan.deleteMany(),
     prisma.adherenceMetric.deleteMany(),
+    prisma.ritualSnooze.deleteMany(),
     prisma.playbookRule.deleteMany(),
     prisma.playbook.deleteMany(),
     prisma.note.deleteMany(),
@@ -1204,6 +1206,236 @@ async function main() {
     });
   }
 
+  // ---------- Encargo 5: rituales y adherencia ----------
+  // El plan completo de la semana pasada con su retro y los resultados
+  // verificados; dos triajes de ritual del lunes pasado (métrica R4);
+  // sesiones y rechazos más antiguos y un plan de hace dos semanas para
+  // que las barras de ocho semanas no nazcan vacías; y tres decisiones ya
+  // cerradas para la métrica de R6 (dos con motivo, una sin él).
+
+  const haceSemanas = (n: number) => new Date(ahora.getTime() - n * 7 * 86_400_000);
+
+  // Plan de la semana pasada, completo, con los dos comprometidos
+  // verificados en la retro: Yajoma salió, Cribo no.
+  const planPasado = await prisma.weeklyPlan.create({
+    data: {
+      user_id: USER_ID,
+      semana_inicio: inicioDeSemana(haceSemanas(1)),
+      proyectos_activos: ["yajoma", "cribo"] as unknown as Prisma.InputJsonValue,
+      completado_paso: 4,
+      created_at: new Date(inicioSemanaPasada + 8 * 3_600_000),
+    },
+  });
+  const RESULTADOS_PASADOS = [
+    {
+      proyecto: "yajoma" as const,
+      descripcion: "Las specs 015 a 017 retro-encajadas y aprobadas por Jaime",
+      cumplido: true,
+    },
+    {
+      proyecto: "cribo" as const,
+      descripcion: "La landing del piloto publicada con el formulario de alta",
+      cumplido: false,
+    },
+  ];
+  for (const r of RESULTADOS_PASADOS) {
+    await prisma.weeklyOutcome.create({
+      data: {
+        user_id: USER_ID,
+        weekly_plan_id: planPasado.id,
+        project_id: porSlug[r.proyecto],
+        descripcion: r.descripcion,
+        cumplido: r.cumplido,
+      },
+    });
+  }
+
+  // Dos capturas de hace dos semanas triadas en el ritual del lunes
+  // pasado: el numerador de la métrica de R4 no nace vacío.
+  const TRIAJES_DE_RITUAL = [
+    { titulo: "Preparar la propuesta del piloto de Cribo para la asesoría", proyecto: "cribo" },
+    { titulo: "Documentar el patrón de eco en formularios con validación", proyecto: "flujo-specs" },
+  ];
+  let capturaRitual = new Date(inicioSemana - 10 * 86_400_000 + 17 * 3_600_000);
+  for (const t of TRIAJES_DE_RITUAL) {
+    const tarea = await prisma.task.create({
+      data: {
+        user_id: USER_ID,
+        project_id: porSlug[t.proyecto],
+        titulo: t.titulo,
+        estado: "backlog",
+        origen: "manual",
+        created_at: capturaRitual,
+      },
+    });
+    await prisma.taskEvent.create({
+      data: {
+        user_id: USER_ID,
+        task_id: tarea.id,
+        estado_anterior: null,
+        estado_nuevo: "inbox",
+        created_at: capturaRitual,
+      },
+    });
+    await prisma.taskEvent.create({
+      data: {
+        user_id: USER_ID,
+        task_id: tarea.id,
+        estado_anterior: "inbox",
+        estado_nuevo: "backlog",
+        via_ritual: true,
+        created_at: new Date(inicioSemanaPasada + 9 * 3_600_000),
+      },
+    });
+    capturaRitual = new Date(capturaRitual.getTime() + 2 * 3_600_000);
+  }
+
+  // Retro de la semana pasada, con la foto de las métricas calculada de
+  // los datos sembrados, no inventada.
+  const metricasPasadas = await metricasDeLaSemana(prisma, haceSemanas(1));
+  await prisma.retro.create({
+    data: {
+      user_id: USER_ID,
+      weekly_plan_id: planPasado.id,
+      que_funciono: "Agrupar las sesiones de Yajoma por la mañana: las specs salieron en tres bloques.",
+      que_no: "La landing de Cribo se quedó sin hueco: demasiado triaje disperso entre semana.",
+      que_pruebo: "Reservar el martes y el jueves de 9 a 11 para Cribo, sin excepciones.",
+      metricas: metricasPasadas as unknown as Prisma.InputJsonValue,
+      created_at: new Date(inicioSemana - 2 * 86_400_000 + 18 * 3_600_000),
+    },
+  });
+
+  // Un plan de hace dos semanas con cuatro activos: la semana en la que
+  // R2 no se cumplió. Sin retro: R5 queda sin dato, como fue.
+  await prisma.weeklyPlan.create({
+    data: {
+      user_id: USER_ID,
+      semana_inicio: inicioDeSemana(haceSemanas(2)),
+      proyectos_activos: ["yajoma", "cribo", "orbia", "orbita"] as unknown as Prisma.InputJsonValue,
+      completado_paso: 4,
+      created_at: new Date(inicioSemana - 14 * 86_400_000 + 8 * 3_600_000),
+    },
+  });
+
+  // Sesiones de las semanas anteriores, para las barras de R3.
+  const SESIONES_ANTIGUAS: {
+    proyecto: "yajoma" | "cribo" | "orbia" | "orbita" | "flujo-specs";
+    hace: number;
+    dia: number;
+    hora: number;
+    duracion: number;
+    estado: "cerrada" | "abandonada";
+    conNota: boolean;
+    intencion: string;
+  }[] = [
+    { proyecto: "yajoma", hace: 2, dia: 0, hora: 10, duracion: 90, estado: "cerrada", conNota: true, intencion: "Cerrar el mapeo de estados de pedido con Odoo" },
+    // Abandonada con la nota escrita al día siguiente: no sale de
+    // abandonada (H3.3) y no cuenta como con nota en la métrica de R3.
+    { proyecto: "cribo", hace: 2, dia: 2, hora: 16, duracion: 50, estado: "abandonada", conNota: false, intencion: "Bocetar la pantalla de resultados del triaje" },
+    { proyecto: "cribo", hace: 3, dia: 1, hora: 9, duracion: 110, estado: "cerrada", conNota: true, intencion: "Afinar el prompt de clasificación documental" },
+    // Cerrada con avance pero sin siguiente paso (R3 estaba en prueba):
+    // el avance es obligatorio siempre; solo falta el siguiente paso.
+    { proyecto: "orbia", hace: 3, dia: 3, hora: 12, duracion: 40, estado: "cerrada", conNota: false, intencion: "Repasar la facturación del trimestre" },
+    { proyecto: "yajoma", hace: 4, dia: 1, hora: 10, duracion: 95, estado: "cerrada", conNota: true, intencion: "Revisar las specs 012 y 013 con el feedback de Jaime" },
+  ];
+  for (const s of SESIONES_ANTIGUAS) {
+    const empieza = new Date(
+      inicioSemana - s.hace * 7 * 86_400_000 + s.dia * 86_400_000 + s.hora * 3_600_000
+    );
+    const termina = new Date(empieza.getTime() + s.duracion * 60_000);
+    await prisma.workSession.create({
+      data: {
+        user_id: USER_ID,
+        project_id: porSlug[s.proyecto],
+        intencion: s.intencion,
+        started_at: empieza,
+        ended_at: termina,
+        duracion_min: s.duracion,
+        estado: s.estado,
+        nota_avance:
+          s.estado === "abandonada"
+            ? "Quedó abandonada; el boceto se retomó al día siguiente."
+            : "Avance registrado al cerrar la sesión.",
+        siguiente_paso: s.conNota ? "Anotado en la tarea correspondiente." : null,
+        created_at: empieza,
+      },
+    });
+  }
+
+  // Rechazos de WIP más antiguos, para que la barra de R1 tenga historia.
+  const RECHAZOS_ANTIGUOS = [
+    { tarea: "Enviar la factura de agosto a Yajoma", hace: 2, dia: 1, hora: 12 },
+    { tarea: "Definir los estados de una spec y sus transiciones", hace: 3, dia: 3, hora: 16 },
+  ];
+  for (const r of RECHAZOS_ANTIGUOS) {
+    await prisma.wipRejection.create({
+      data: {
+        user_id: USER_ID,
+        task_id: tareasPorTitulo[r.tarea],
+        limite: 3,
+        created_at: new Date(
+          inicioSemana - r.hace * 7 * 86_400_000 + r.dia * 86_400_000 + r.hora * 3_600_000
+        ),
+      },
+    });
+  }
+
+  // Tres decisiones ya cerradas (la métrica de R6 mide el motivo
+  // registrado): dos con motivo y una sin él, cerrada antes de que
+  // existiera la regla.
+  const DECISIONES_CERRADAS = [
+    {
+      proyecto: "yajoma",
+      titulo: "Pasarela de pago del portal de pedidos B2B",
+      opciones: ["Stripe", "Redsys con el TPV del banco"],
+      elegida: "Redsys con el TPV del banco",
+      motivo: "El banco de Yajoma bonifica el TPV y la asesoría ya lo tiene contratado.",
+      abiertaHaceDias: 34,
+      cerradaHaceSemanas: 1,
+      diaDeCierre: 2,
+    },
+    {
+      proyecto: "cribo",
+      titulo: "Nombre del plan gratuito del piloto",
+      opciones: ["Starter", "Gratis"],
+      elegida: "Gratis",
+      motivo: null,
+      abiertaHaceDias: 45,
+      cerradaHaceSemanas: 2,
+      diaDeCierre: 3,
+    },
+    {
+      proyecto: "yajoma",
+      titulo: "Versión de Odoo sobre la que construir el módulo de pedidos",
+      opciones: ["Quedarse en la 16", "Migrar a la 17 antes del módulo"],
+      elegida: "Migrar a la 17 antes del módulo",
+      motivo: "Yajoma migra a la 17 en octubre; construir dos veces no tiene sentido.",
+      abiertaHaceDias: 52,
+      cerradaHaceSemanas: 3,
+      diaDeCierre: 1,
+    },
+  ];
+  for (const d of DECISIONES_CERRADAS) {
+    const cerrada = new Date(
+      inicioSemana - d.cerradaHaceSemanas * 7 * 86_400_000 + d.diaDeCierre * 86_400_000 + 13 * 3_600_000
+    );
+    const abierta = new Date(cerrada.getTime() - d.abiertaHaceDias * 86_400_000);
+    await prisma.decision.create({
+      data: {
+        user_id: USER_ID,
+        project_id: porSlug[d.proyecto],
+        titulo: d.titulo,
+        opciones: d.opciones as unknown as Prisma.InputJsonValue,
+        estado: "cerrada",
+        opcion_elegida: d.elegida,
+        motivo: d.motivo,
+        abierta_desde: abierta,
+        cerrada_el: cerrada,
+        dias_abierta: d.abiertaHaceDias,
+      },
+    });
+  }
+
   const resumen = {
     proyectos: await prisma.project.count(),
     briefs: await prisma.projectBrief.count(),
@@ -1212,8 +1444,10 @@ async function main() {
     hitos: await prisma.milestone.count(),
     planes: await prisma.weeklyPlan.count(),
     resultados: await prisma.weeklyOutcome.count(),
+    retros: await prisma.retro.count(),
     tareas: await prisma.task.count(),
     eventos: await prisma.taskEvent.count(),
+    eventos_ritual: await prisma.taskEvent.count({ where: { via_ritual: true } }),
     sesiones: await prisma.workSession.count(),
     rechazos_wip: await prisma.wipRejection.count(),
   };

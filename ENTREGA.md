@@ -1,138 +1,214 @@
-# ENTREGA — Encargo 4b · Sincronizar especificación y cerrar dos huecos
+# ENTREGA — Encargo 5 · Rituales semanales y Playbook
 
-Escrito para el agente del encargo siguiente (el 5 del documento 03,
-rituales y métricas de adherencia, que sigue entero por hacer). Tres
-partes: la especificación alineada con lo construido, el alta y la
-edición de decisiones, y los rechazos por límite de WIP persistidos.
+Escrito para el agente del encargo siguiente (el 6 del documento 03, el
+motor de investigación, que sigue entero por hacer). Cubre las historias
+H4.1, H4.2, H4.3, H5.1, H5.2 y H5.3: la planificación semanal en cuatro
+pasos, la retrospectiva con métricas reales, el aviso de ritual
+pendiente, el Playbook versionado con interruptor efectivo y las seis
+métricas de adherencia con sus barras de ocho semanas.
 
 ## Qué construí
 
-### Parte 1 — Especificación sincronizada (fuera del repositorio)
+### Parte 1 — Planificación semanal guiada (H4.1)
 
-Los documentos 00 (brief maestro), 02 (historias de usuario) y 05 (adenda
-Flujo de specs) reescritos para reflejar las decisiones de DUDAS.md 1 a
-41, sin historias nuevas y sin cambios de alcance. Cada documento termina
-con un registro de cambios que dice qué párrafo cambió y qué DUDA lo
-motiva. Lo gordo: el 00 pasa a seis reglas con la semántica viva del
-playbook (parámetros en JSON, desactivar desactiva, validación solo sobre
-transiciones nuevas) y el quinto proyecto; el 02 absorbe las decisiones de
-los encargos 2 a 4 en H1.1-H1.4, H2.1-H2.6, H3.1-H3.4, H5.1, H5.3 (métrica
-de R6 de la adenda 04), H7.1 (sección de decisiones bloqueadas tras los
-hallazgos) y H8.1-H8.2; el 05 pasa de instrucción a estado (cinco ramas
-implementadas y consumidas, sin interfaz de continuos).
+- `web/src/lib/servicio-rituales.ts` — el servicio entero del ritual:
+  `elementosDelInbox`, `triarEnRitual` (a proyecto y backlog o semana, o
+  descartar; el evento queda marcado `via_ritual`), `avanzarTrasTriaje`
+  (el bloqueo del paso 1: con el inbox sin vaciar no se avanza; crea el
+  WeeklyPlan con `completado_paso` 1), `guardarProyectosActivos` (límite
+  leído de `parametros.limite` de R2 vía `limiteDeActivos`; los elegidos
+  a activo y el resto a pausa en la misma transacción),
+  `guardarResultados` (una frase por proyecto activo; conserva el
+  cumplido al reeditar) y `guardarTareasDeLaSemana` (backlog ↔ semana
+  con eventos del ritual; deja `completado_paso` 4).
+- `web/src/app/(app)/rituales/planificacion/page.tsx` — el asistente:
+  un paso por pantalla, chips de navegación con retroceso libre hasta lo
+  alcanzado, reanudación por `completado_paso` y modo edición si el plan
+  de la semana ya está completo (se entra por el paso 1 y no se
+  duplica: `semana_inicio` es único). Los recordatorios de las reglas
+  propias aparecen en el paso de su categoría.
+- `web/src/components/ritual/paso-triaje.tsx`, `paso-proyectos.tsx`,
+  `paso-resultados.tsx`, `paso-tareas.tsx` — los cuatro pasos, con eco
+  de errores del servidor (patrón de la DUDA 32).
+- `web/src/app/(app)/rituales/page.tsx` — la puerta de los rituales:
+  estado de cada uno, retomar por el paso que toca, avisos de hecho.
 
-**Ojo: estos ficheros no viven en el repositorio** (DUDA 45). Se
-entregaron como ficheros del hilo y hay que sustituir los adjuntos del
-agente constructor y del proyecto de diseño. Si lees esto en un hilo
-nuevo y los adjuntos 00/02/05 no llevan el registro de cambios del 4b al
-final, avisa: te pasaron la especificación vieja.
+### Parte 2 — Retrospectiva (H4.2)
 
-### Parte 2 — Alta y edición de decisiones
+- `servicio-rituales.ts` — `metricasDeLaSemana` (tareas completadas,
+  sesiones, minutos, porcentaje con nota, intentos de saltar el WIP
+  desde `wip_rejections`; sesiones agrupadas por su arranque, como
+  H3.4), `marcarResultado` (cumplido o no, sin opción intermedia),
+  `guardarRetro` (upsert con la foto de las métricas en `metricas`) y
+  `convertirCambioEnRegla` (qué cambio pruebo → regla propia de
+  categoría revisión, versión nueva del playbook).
+- `web/src/app/(app)/rituales/retrospectiva/page.tsx` — resultados con
+  dos botones, cifras grandes en serif (documento 01) y los tres campos
+  libres; el botón de convertir aparece cuando qué cambio pruebo lleva
+  texto (`web/src/components/ritual/formulario-retro.tsx`).
 
-- `web/src/lib/decisiones.ts` — `validarDatosDecision`: título
-  obligatorio (máximo 200), opciones una por línea con recorte, descarte
-  de vacías y deduplicación exacta, al menos dos (R6 literal: con una no
-  hay decisión), quién bloquea opcional (vacío queda nulo).
-- `web/src/lib/servicio-proyectos.ts` — `crearDecision` (nace abierta,
-  `abierta_desde` en la creación; archivado la rechaza, pausado la
-  admite) y `actualizarDecision` (solo abiertas: las cerradas son
-  registro histórico; edita título, opciones y bloqueado_por en
-  transacción). Validación siempre en servidor.
-- `web/src/app/(app)/proyectos/acciones.ts` — `crearDecisionAction` y
-  `editarDecisionAction` con eco de valores al fallar (DUDA 32) y avisos
-  `?decision=creada|editada` que la página del proyecto pinta.
-- `web/src/components/decisiones-abiertas.tsx` — botón Nueva decisión
-  con formulario en la propia sección (también con la lista vacía) y
-  Editar en cada fila, junto a Cerrar decisión. Campos compartidos entre
-  alta y edición.
-- Efecto buscado: editar las opciones de una abierta permite añadir la
-  ganadora antes de cerrar, mitigando el límite de la DUDA 16 sin campo
-  libre (test del flujo completo).
+### Parte 3 — Aviso de ritual pendiente (H4.3)
 
-### Parte 3 — Rechazos por límite de WIP persistidos
+- `servicio-rituales.ts` — `avisoDeRitual` (lunes sin plan completo:
+  aviso y atenuar; viernes con plan y sin retro: aviso sin atenuar) y
+  `posponerRitual` (silencia el día civil en curso).
+- `web/src/app/(app)/hoy/page.tsx` — el banner en cabecera con Hacer y
+  Posponer hasta mañana; el resto de la pantalla al 40% de opacidad
+  cuando toca atenuar.
+- Migración `20260826101253_ritual_playbook`: tabla `ritual_snoozes` y
+  columna `via_ritual` en `task_events`.
 
-- **Primera migración desde el encargo 2**:
-  `web/prisma/migrations/20260826084125_wip_rejections` crea
-  `wip_rejections` (id, user_id, task_id con cascada, limite, created_at).
-- `web/src/lib/servicio-tareas.ts` — el rechazo de `cambiarEstadoTarea`
-  crea el registro dentro de la misma transacción, con el límite vigente
-  de R1. Devolver sin lanzar no revierte: el registro persiste aunque la
-  transición no ocurra. Con R1 desactivada no hay validación, ni rechazo,
-  ni registro (DUDA 44). `rechazosDeWip(db, rango?)` es la consulta para
-  el encargo 5: el numerador de la métrica de R1; el denominador sale de
-  los TaskEvent hacia en_curso.
-- `web/prisma/seed.ts` — tres rechazos plausibles (dos de la semana
-  pasada, uno de esta) sobre tareas de semana, con límite 3. El resumen
-  del seed imprime `rechazos_wip`.
+### Parte 4 — Playbook (H5.1, H5.2)
+
+- `web/src/lib/playbook.ts` — dominio puro: categorías, claves de
+  reglas propias (R7 en adelante, sin reutilizar), validación de texto
+  y parámetros (`limite` en R1 y R2, `dias_umbral` en R6) y
+  `diffDeVersiones` para el historial.
+- `web/src/lib/servicio-playbook.ts` — `versionVigente`,
+  `recordatoriosDelPlaybook` y `crearVersionConCambio`: cada mutación
+  (alternar, editar, añadir, retirar) copia las reglas a una versión
+  nueva conservando la fecha de alta, con motivo del usuario o
+  automático. Las validaciones (limiteWip, limiteDeActivos, r3Activa,
+  umbralDiasR6) ya leían la última versión: el interruptor desactiva la
+  validación de verdad, verificado de punta a punta.
+- `web/src/app/(app)/playbook/page.tsx` — las seis reglas base con
+  texto, categoría, fecha de alta, parámetros, interruptor y la barra
+  fina de cuatro semanas (documento 01); reglas propias con retirar;
+  retiradas tachadas en un histórico plegable.
+- `web/src/app/(app)/playbook/[clave]/page.tsx` — la ficha: definición
+  exacta de la métrica y las barras de ocho semanas.
+- `web/src/app/(app)/playbook/versiones/page.tsx` — el historial con
+  fecha, motivo y qué cambió en cada versión.
+
+### Parte 5 — Métricas de adherencia (H5.3)
+
+- `web/src/lib/adherencia.ts` — las seis fórmulas, cada una una función
+  pura con su test: R1 rechazos persistidos / TaskEvent a en_curso; R2
+  activos del plan de la semana ≤ `parametros.limite` (nunca un 3 en
+  duro); R3 cerradas con nota / total, abandonadas sin puntuar; R4
+  procesados en el ritual (`via_ritual`) / capturados; R5 cumplidos /
+  comprometidos, sin dato hasta la retro; R6 cerradas con motivo /
+  cerradas. Semanas civiles de lunes en Europe/Madrid
+  (`rangoDeSemanaPura` y `ultimasSemanas` nuevos en `semana.ts`).
+- `web/src/lib/servicio-adherencia.ts` — el job semanal perezoso:
+  materializa las semanas cerradas en `adherence_metrics` al leer la
+  ficha (idempotente, la semana en curso al vuelo). Ver DUDA 46.
+- `web/src/components/barras-adherencia.tsx` — las barras de ocho
+  semanas con porcentaje y fracción cruda, y la tira fina de cuatro.
 
 ### Tests y verificación
 
-- Unitarios: `validarDatosDecision` (5 casos en
-  `src/lib/decisiones.test.ts`).
-- Integración: alta y edición en `web/tests/decisiones.test.ts` (alta
-  limpia, rechazos de servidor, archivado frente a pausado, flujo de la
-  opción ganadora añadida, cerrada intocable) y rechazos de WIP en
-  `web/tests/tareas.test.ts` (rechazo registra con límite, insistir
-  registra otro, transición válida no registra, consulta por rango, R1
-  apagada no registra). Van en esos ficheros a propósito: vitest corre
-  los ficheros en paralelo y así lo que toca R1 o decisiones queda
-  serializado con sus vecinos.
-- `npm test`: 148/148 (12 nuevos). `tsc --noEmit` limpio.
-- `comprobar-rutas.mjs`: 38 comprobaciones (nueva: el detalle de proyecto
-  muestra Nueva decisión y Editar).
-- `verificar-visual.mjs`: además de todo lo anterior, abre el alta y la
-  edición de decisión en ambos tamaños, sin desbordamiento y con consola
-  limpia.
+- Unitarios: 24 nuevos (`src/lib/adherencia.test.ts`, las seis fórmulas
+  y las barras; `src/lib/playbook.test.ts`, claves, validación y diff).
+- Integración: 25 nuevos (`tests/rituales.test.ts`: bloqueo del paso 1,
+  triaje marcado, límite del paso 2 leído del playbook y cambiado en
+  caliente, pausa del resto, resultados con cumplido conservado, paso 4
+  con eventos, sin duplicar plan, retro con foto de métricas,
+  conversión en regla, avisos del lunes y el viernes con posponer;
+  `tests/playbook.test.ts`: el interruptor apaga limiteWip, r3Activa y
+  umbralDiasR6 de verdad, edición de parámetros, propias, historial,
+  fecha de alta conservada; `tests/adherencia.test.ts`: cada métrica
+  contra la base, R2 con el límite editado, materialización idempotente
+  y semana en curso sin persistir). Los tests restauran proyectos,
+  inbox, tareas y versiones: el seed queda como estaba.
+- `npm test`: 197/197 (49 nuevos), dos pasadas seguidas en verde.
+  `tsc --noEmit` limpio. `next build` limpio.
+- Verificación visual con Playwright: 13 rutas × 2 tamaños (375x812 y
+  1440x900), sin desbordamiento horizontal ni errores de consola, y el
+  interruptor de R4 ejercitado desde el navegador (versión 1 → 3).
 
 ## Qué decidí
 
-DUDAS 42 a 45 nuevas; la 15 queda resuelta en parte y la 16 mitigada.
-Resumen: solo se editan abiertas (42); el alta exige dos opciones y
-deduplica exacto (43); los rechazos se registran solo cuando R1 valida,
-con el límite vigente, y producción acumula los suyos desde cero (44);
-la especificación sincronizada vive en el conocimiento del agente, no en
-el repositorio (45).
+- **El paso 1 bloquea el avance** (H4.1 literal, confirmado por el
+  usuario en el plan): es flujo del asistente, no la validación blanda
+  de R4; desactivar R4 no lo relaja. Descartar cuenta como procesado.
+  DUDA 6 actualizada.
+- El "job semanal" es un cálculo perezoso idempotente materializado en
+  `adherence_metrics`; las semanas cerradas quedan como foto (DUDA 46).
+- Las métricas miden contra el parámetro vigente de la última versión;
+  una regla desactivada conserva ficha y barras (DUDA 47).
+- R2 se evalúa contra el plan de cada semana y R5 exige retro; semana
+  sin plan o sin retro queda sin dato (DUDA 48).
+- R1 y R4 pueden superar el 100%: fracción cruda en la ficha, barra
+  recortada y la de R1 invertida (DUDA 49).
+- En el triaje del ritual, backlog o semana exigen proyecto (DUDA 50).
+- El paso 2 no impone mínimo; continuos sin plaza; R2 apagada sin tope
+  (DUDA 51). Editar el plan puede retirar resultados (DUDA 52).
+- Reglas propias: solo ellas se retiran; recordatorios por categoría;
+  la conversión desde la retro nace en revisión (DUDA 53). Motivo
+  automático si no se escribe (DUDA 54).
+- Posponer silencia el día civil; el viernes solo avisa con plan
+  completo y retro pendiente (DUDA 55).
+- Seed: plan y retro de la semana pasada con métricas calculadas al
+  sembrar, plan de hace dos semanas con cuatro activos, triajes de
+  ritual, sesiones y rechazos antiguos y tres decisiones cerradas, dos
+  con motivo (DUDA 56). `WeeklyPlan.proyectos_activos` queda fijado en
+  slugs (DUDA 21 resuelta).
+- El documento 03 dice "cinco reglas" y "cinco métricas": es anterior a
+  la adenda 04. Son seis, como fija el 02 sincronizado.
 
 ## Qué quedó fuera
 
-- Vista de decisiones cerradas y estado `caducada` (DUDA 15, sigue).
-- Alta o cierre de decisiones desde la pantalla Hoy: el cierre sigue solo
-  en el detalle del proyecto.
-- La métrica de adherencia de R1 y su interfaz: este encargo deja el
-  origen de datos; la métrica es del encargo 5.
-- Edición de `abierta_desde` y del estado de una decisión.
-- Cualquier historia nueva en la especificación: la parte 1 solo alinea.
+- H5.4 (propuesta de mejora mensual): prioridad P, no está en las
+  historias del encargo.
+- Un cron real para las métricas: el job perezoso cumple el cálculo
+  semanal sin infraestructura nueva; si algún día hace falta terminar
+  las semanas sin esperar a una visita, es un endpoint que llame a
+  `metricasDeRegla` desde un scheduler (el del engine llega con el 6).
+- La vista de decisiones cerradas y el estado `caducada` (DUDA 15).
+- El histórico de parámetros por semana (DUDA 47): las barras pasadas
+  se leen con el límite vigente.
+- Recordatorios de reglas propias fuera de los rituales.
+- Editar o reactivar reglas retiradas: quedan tachadas en el histórico.
 
 ## Qué falta verificar a mano
 
-- **Sustituir los adjuntos 00, 02 y 05** del agente constructor (y del
-  proyecto de diseño) por los ficheros entregados en el hilo. Hasta
-  entonces, los agentes leerán la especificación desincronizada.
-- **El alta y la edición en producción con tu sesión**: crear una
-  decisión con dos opciones y quién la bloquea, editarla para añadir una
-  tercera, cerrarla eligiendo la añadida. El aviso debe decir "Decisión
-  registrada" y "Decisión editada".
+- **El ritual completo en producción con tu sesión**: triar el inbox
+  (comprobar que sin vaciarlo no deja avanzar), elegir activos (con
+  cinco activos y R2 en 3 tendrás que dejar fuera dos), escribir los
+  resultados, montar la semana y ver el plan reflejado en /proyectos.
+- **La retrospectiva en producción**: marcar cumplido/no cumplido,
+  guardar con qué cambio pruebo y convertirlo en regla; comprobar que
+  la regla nueva aparece en el Playbook como R7 con su versión.
+- **El aviso del lunes y del viernes reales**: el lunes que viene, Hoy
+  debe amanecer atenuado con el banner; posponer debe silenciarlo hasta
+  el martes. No se puede simular sin cambiar la fecha del servidor.
 - **La migración en producción**: el despliegue ejecuta
-  `prisma migrate deploy` en el preDeployCommand; comprueba en el panel
-  que el deploy pasó el health check. La tabla `wip_rejections` empieza
-  vacía en producción (el seed no se relanza): fuerza un rechazo real
-  (con 3 en curso, intenta una cuarta) si quieres ver el primer registro.
+  `prisma migrate deploy` (crea `ritual_snoozes` y `via_ritual`);
+  comprueba que el deploy pasa el health check.
+- **Las barras en producción**: producción no se resiembra, así que las
+  semanas pasadas saldrán casi todas "sin dato" y se irán llenando con
+  el uso real. Es lo esperado, no un fallo.
 
 ## Verificación criterio a criterio
 
 | Criterio | Cumple | Nota |
 |---|---|---|
-| 00, 02 y 05 alineados con DUDAS 1-41 sin cambiar alcance | Sí | Sin historias nuevas; registro de cambios al final de cada fichero |
-| Cada documento indica qué cambió y por qué | Sí | Sección "Registro de cambios" con la DUDA que motiva cada edición |
-| Alta de decisión con título, opciones y quién bloquea | Sí | Formulario en la sección de decisiones; validación en servidor |
-| Edición de decisiones existentes | Sí | Solo abiertas (DUDA 42); test de que una cerrada no se toca |
-| Al menos dos opciones consideradas (R6) | Sí | Unitario e integración; deduplicación exacta |
-| Rechazos de WIP persistidos como registros | Sí | En la transacción del rechazo, con el límite vigente |
-| Origen de datos listo para la métrica de R1 del encargo 5 | Sí | rechazosDeWip por rango + TaskEvent como denominador |
-| R1 desactivada no registra intentos | Sí | Test con la regla apagada |
-| Migración versionada, sin cambios de esquema fuera de migración | Sí | 20260826084125_wip_rejections |
-| Test del criterio principal | Sí | 148/148 (12 nuevos) |
-| Sin errores en consola | Sí | Playwright, incluidos los formularios nuevos |
-| Correcto a 375px | Sí | Alta y edición verificados en ambos tamaños |
-| Español de España, sin exclamaciones ni emojis | Sí | Interfaz, mensajes y documentos |
-| Datos de ejemplo en el seed | Sí | 3 rechazos de WIP; las 17 decisiones ya estaban |
+| H4.1: cuatro pasos, uno por pantalla, con retroceso | Sí | Chips de navegación hasta el paso alcanzado |
+| H4.1: paso 1 no avanza con el inbox sin vaciar; descartar cuenta | Sí | Bloqueo en servidor con test; botón deshabilitado además en la interfaz |
+| H4.1: paso 2 hasta el límite y el resto a pausa automática | Sí | Límite de parametros.limite de R2; test con el límite editado a 5 y con R2 apagada |
+| H4.1: paso 3 una frase por proyecto activo | Sí | Falta una y el servidor rechaza con eco |
+| H4.1: paso 4 tareas del backlog de cada activo | Sí | Marcado queda en semana; desmarcado vuelve |
+| H4.1: plan existente abre en edición y no se duplica | Sí | semana_inicio único; test de recuento |
+| H4.1: abandonable y retomable, progreso paso a paso | Sí | completado_paso en WeeklyPlan; el hub retoma por el paso que toca |
+| H4.2: cumplido / no cumplido sin opción intermedia | Sí | Dos botones por resultado |
+| H4.2: métricas de la semana calculadas de verdad | Sí | Cinco cifras desde la base, intentos de WIP incluidos |
+| H4.2: tres campos libres y botón de convertir en regla | Sí | El botón aparece con texto en qué cambio pruebo; test de la conversión |
+| H4.3: lunes aviso en cabecera y resto atenuado hasta hacer o posponer | Sí | Opacidad 40; posponer persiste por día civil |
+| H4.3: viernes igual sin atenuar | Sí | Solo con plan completo y retro pendiente |
+| H5.1: seis reglas precargadas con categoría, estado, alta y parámetros | Sí | El "cinco" del documento 03 es anterior a la adenda 04 |
+| H5.1: desactivar desactiva la validación de verdad | Sí | Tests de limiteWip, r3Activa y umbralDiasR6 apagados; verificado también desde el navegador |
+| H5.1: reglas propias sin validación, como recordatorios | Sí | Por categoría en su ritual; alta y retirada con versión |
+| H5.2: cada cambio crea versión con fecha y motivo | Sí | Motivo del usuario o automático |
+| H5.2: historial completo con qué cambió | Sí | Diff por clave entre versiones consecutivas |
+| H5.3: seis métricas con las definiciones exactas, cada fórmula una función con test | Sí | adherencia.ts, 24 tests unitarios |
+| H5.3: R1 usa los rechazos persistidos del 4b | Sí | wip_rejections como numerador; test de integración |
+| H5.3: R2 lee parametros.limite, no un 3 en duro | Sí | Test con el límite cambiado a 5 en caliente |
+| H5.3: calculadas semanalmente por un job | Sí, con nota | Job perezoso idempotente materializado en adherence_metrics (DUDA 46), sin cron |
+| H5.3: barras de las últimas ocho semanas en la ficha | Sí | Más la tira fina de cuatro en la tarjeta (documento 01) |
+| Semana de lunes y Europe/Madrid en todos los cálculos | Sí | rangoDeSemanaPura sobre la medianoche de Madrid; tests de bordes ya existentes |
+| Test del criterio principal | Sí | 197/197, 49 nuevos; dos pasadas seguidas en verde |
+| Sin errores en consola | Sí | Playwright en 13 rutas × 2 tamaños |
+| Correcto a 375px | Sí | Sin desbordamiento horizontal en ninguna ruta |
+| Español de España, sin exclamaciones ni emojis | Sí | Interfaz, avisos y documentos |
+| Datos de ejemplo en el seed | Sí | Plan y retro de la semana pasada, triajes de ritual, decisiones cerradas, sesiones y rechazos antiguos |

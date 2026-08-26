@@ -157,6 +157,13 @@ export async function cambiarEstadoTarea(
         if (limite !== null) {
           const enCurso = await tareasEnCursoQueCuentan(tx);
           if (enCurso.length >= limite) {
+            // Encargo 4b: el intento rechazado queda registrado, con el
+            // límite vigente. Es el numerador de la métrica de R1 (H5.3).
+            // Devolver sin lanzar no revierte la transacción: el registro
+            // persiste aunque la transición no ocurra.
+            await tx.wipRejection.create({
+              data: { user_id: USER_ID, task_id: tarea.id, limite },
+            });
             return {
               ok: false as const,
               error: mensajeLimiteWip(limite),
@@ -390,4 +397,35 @@ export async function detalleDeTarea(db: Db, tareaId: string) {
     },
   });
   return tarea;
+}
+
+// ---------- Rechazos por límite de WIP (encargo 4b) ----------
+
+export type RechazoDeWip = {
+  id: string;
+  tareaId: string;
+  tareaTitulo: string;
+  limite: number;
+  fecha: Date;
+};
+
+// Rechazos registrados en un rango [desde, hasta). Es el origen de datos
+// de la métrica de adherencia de R1 (H5.3): intentos rechazados sobre
+// transiciones a en_curso. El denominador sale de TaskEvent.
+export async function rechazosDeWip(
+  db: Db,
+  rango?: { desde: Date; hasta: Date }
+): Promise<RechazoDeWip[]> {
+  const filas = await db.wipRejection.findMany({
+    where: rango ? { created_at: { gte: rango.desde, lt: rango.hasta } } : undefined,
+    include: { task: { select: { titulo: true } } },
+    orderBy: { created_at: "asc" },
+  });
+  return filas.map((r) => ({
+    id: r.id,
+    tareaId: r.task_id,
+    tareaTitulo: r.task.titulo,
+    limite: r.limite,
+    fecha: r.created_at,
+  }));
 }

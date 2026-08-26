@@ -82,16 +82,20 @@ esto se ha implementado más allá de lo que se indica.
 
 ## Del encargo 3
 
-15. **Decisiones: solo listado de abiertas y cierre.** El encargo pide el
-    listado por proyecto y el cierre con opción y motivo. No hay alta ni
-    edición de decisiones desde la interfaz, ni vista de cerradas, ni
-    gestión del estado `caducada` (el enum existe y nada lo usa aún). Si
-    hace falta, es una historia nueva.
+15. **Decisiones: solo listado de abiertas y cierre** — **resuelta en
+    parte en el encargo 4b.** Hay alta (título, opciones consideradas y
+    quién la bloquea) y edición de decisiones abiertas desde la sección
+    de decisiones del detalle del proyecto. Siguen fuera: la vista de
+    cerradas y la gestión del estado `caducada` (el enum existe y nada
+    lo usa aún).
 
 16. **La opción elegida tiene que ser una de las consideradas.** Es la
     lectura literal de "registrando la opción elegida". Si al cerrar de
     verdad gana una opción que no estaba en la lista, hoy no se puede: se
     documenta como límite. Alternativa descartada: campo libre.
+    **Actualización del encargo 4b:** el límite queda mitigado sin campo
+    libre: la edición de decisiones abiertas permite añadir la opción
+    ganadora a las consideradas antes de cerrar (hay test del flujo).
 
 17. **Botón "Regenerar intents" deshabilitado.** H1.2 pide el aviso "El
     brief cambió desde la última derivación de intents" con un botón para
@@ -249,3 +253,36 @@ esto se ha implementado más allá de lo que se indica.
     documento 01 los sitúa ahí, pero codifican el avance del resultado
     comprometido y este encargo pide omitir esa parte. Llegan con la
     pantalla Hoy completa del encargo 7.
+
+## Del encargo 4b (sincronización y dos huecos)
+
+42. **Solo se editan decisiones abiertas.** Las cerradas son registro
+    histórico y el servidor rechaza tocarlas. Campos editables: título,
+    opciones consideradas y quién la bloquea. `abierta_desde` nace en la
+    creación y no se edita; los días abiertos siguen calculándose al
+    leer (DUDA 2).
+
+43. **El alta exige al menos dos opciones no vacías.** Lectura literal de
+    R6: con una sola opción no hay decisión que registrar. Las opciones
+    llegan una por línea; se recortan, se descartan las vacías y las
+    repetidas exactas se quedan con la primera aparición. Quién bloquea
+    es opcional y el vacío queda como nulo. Un proyecto archivado no
+    admite decisiones nuevas; uno en pausa sí (por H1.3 no saldrán en el
+    brief diario). El cierre no se duplica en Hoy: sigue en el detalle
+    del proyecto.
+
+44. **Los rechazos por límite de WIP se persisten en `wip_rejections`,**
+    dentro de la misma transacción del rechazo y con el límite vigente
+    de R1. Con la regla desactivada no hay validación, ni rechazo, ni
+    registro: los intentos con R1 apagada no cuentan para la métrica.
+    La métrica de H5.3 (encargo 5) ya tiene numerador (los rechazos) y
+    denominador (los TaskEvent hacia en_curso). Producción no se
+    resiembra: sus registros empiezan vacíos y se acumulan con el uso
+    real; los tres del seed son de desarrollo.
+
+45. **La especificación sincronizada no vive en el repositorio.** Los
+    documentos 00, 02 y 05 alineados con las DUDAS 1 a 41 se entregaron
+    como ficheros del hilo, con un registro de cambios al final de cada
+    uno; el usuario sustituye los adjuntos del agente constructor y los
+    del proyecto de diseño. El repositorio sigue guardando solo código,
+    ENTREGA.md y este fichero.

@@ -5,7 +5,13 @@
 
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { hashContenido, normalizarContenido, parsearSecciones } from "./brief";
-import { diasAbierta, diasEntre, opcionesComoLista, validarCierre } from "./decisiones";
+import {
+  diasAbierta,
+  diasEntre,
+  opcionesComoLista,
+  validarCierre,
+  validarDatosDecision,
+} from "./decisiones";
 import {
   generarSlug,
   mensajeCreadoEnPausa,
@@ -250,6 +256,68 @@ export async function cerrarDecision(
         motivo: cierre.motivo,
         cerrada_el: ahora,
         dias_abierta: diasEntre(decision.abierta_desde, ahora),
+      },
+    });
+    return { ok: true as const };
+  });
+}
+
+// Alta de una decisión (encargo 4b): nace abierta, con abierta_desde en
+// el momento de la creación. Un proyecto archivado no admite decisiones
+// nuevas; uno en pausa sí (no aparecerán en el brief diario por H1.3).
+export async function crearDecision(
+  db: PrismaClient,
+  slug: string,
+  entrada: { titulo: string; opciones: string; bloqueadoPor?: string },
+  ahora: Date = new Date()
+): Promise<ResultadoCierreDecision> {
+  const validacion = validarDatosDecision(entrada);
+  if (!validacion.ok) return { ok: false, error: validacion.error };
+  const proyecto = await db.project.findUnique({ where: { slug } });
+  if (!proyecto) return { ok: false, error: "El proyecto no existe." };
+  if (proyecto.estado === "archivado") {
+    return { ok: false, error: "Un proyecto archivado no admite decisiones nuevas. Recupéralo primero." };
+  }
+  await db.decision.create({
+    data: {
+      user_id: USER_ID,
+      project_id: proyecto.id,
+      titulo: validacion.datos.titulo,
+      opciones: validacion.datos.opciones,
+      bloqueado_por: validacion.datos.bloqueadoPor,
+      estado: "abierta",
+      abierta_desde: ahora,
+    },
+  });
+  return { ok: true };
+}
+
+// Edición de una decisión abierta (encargo 4b): título, opciones y quién
+// la bloquea. Las cerradas son registro histórico y no se tocan. Editar
+// las opciones permite añadir la ganadora antes de cerrar, cuando la de
+// verdad no estaba entre las consideradas.
+export async function actualizarDecision(
+  db: PrismaClient,
+  decisionId: string,
+  entrada: { titulo: string; opciones: string; bloqueadoPor?: string }
+): Promise<ResultadoCierreDecision> {
+  const validacion = validarDatosDecision(entrada);
+  if (!validacion.ok) return { ok: false, error: validacion.error };
+  return db.$transaction(async (tx) => {
+    const decision = await tx.decision.findUnique({ where: { id: decisionId } });
+    if (!decision) return { ok: false as const, error: "La decisión no existe." };
+    if (decision.estado !== "abierta") {
+      return {
+        ok: false as const,
+        error: "Solo se editan decisiones abiertas: las cerradas son registro histórico.",
+      };
+    }
+    await tx.decision.update({
+      where: { id: decision.id },
+      data: {
+        titulo: validacion.datos.titulo,
+        opciones: validacion.datos.opciones,
+        bloqueado_por: validacion.datos.bloqueadoPor,
       },
     });
     return { ok: true as const };

@@ -1,121 +1,138 @@
-# ENTREGA — Encargo suelto · Pantalla Hoy reducida
+# ENTREGA — Encargo 4b · Sincronizar especificación y cerrar dos huecos
 
-Escrito para el agente del encargo siguiente, que no ha visto este hilo.
-Este fue un encargo suelto que adelanta parte de H7.1: no es el encargo 5
-del documento 03 (rituales y métricas de adherencia, que siguen enteros
-por hacer) ni la pantalla Hoy completa del encargo 7.
+Escrito para el agente del encargo siguiente (el 5 del documento 03,
+rituales y métricas de adherencia, que sigue entero por hacer). Tres
+partes: la especificación alineada con lo construido, el alta y la
+edición de decisiones, y los rechazos por límite de WIP persistidos.
 
 ## Qué construí
 
-Cuatro secciones en `/hoy`, en este orden, cada una omitida por completo
-cuando no tiene contenido (solo la de sesión está siempre):
+### Parte 1 — Especificación sincronizada (fuera del repositorio)
 
-1. **En curso** — las tareas en estado en_curso, con las bloqueadas
-   marcadas en ámbar con su motivo. Reutiliza la fila de tarea del
-   encargo 4 tal cual: casilla de hecha, transiciones, aviso de WIP y
-   petición de siguiente paso funcionan desde Hoy (las actions ya
-   revalidaban /hoy).
-2. **Sesión** — la sesión activa con cronómetro vivo (desde startedAt del
-   servidor, como el lateral), intención y botón de cierre; o el botón de
-   empezar si no hay ninguna.
-3. **Notas de cierre de ayer** — sesiones terminadas en el día civil de
-   ayer en Europe/Madrid con su nota: avance, bloqueo, siguiente paso,
-   proyecto, duración; las abandonadas anotadas van marcadas.
-4. **Decisiones bloqueadas** — decisiones abiertas por encima del umbral
-   de R6, con quién las bloquea, ordenadas de más antigua a menos. Cada
-   título enlaza al detalle del proyecto, donde vive el cierre.
+Los documentos 00 (brief maestro), 02 (historias de usuario) y 05 (adenda
+Flujo de specs) reescritos para reflejar las decisiones de DUDAS.md 1 a
+41, sin historias nuevas y sin cambios de alcance. Cada documento termina
+con un registro de cambios que dice qué párrafo cambió y qué DUDA lo
+motiva. Lo gordo: el 00 pasa a seis reglas con la semántica viva del
+playbook (parámetros en JSON, desactivar desactiva, validación solo sobre
+transiciones nuevas) y el quinto proyecto; el 02 absorbe las decisiones de
+los encargos 2 a 4 en H1.1-H1.4, H2.1-H2.6, H3.1-H3.4, H5.1, H5.3 (métrica
+de R6 de la adenda 04), H7.1 (sección de decisiones bloqueadas tras los
+hallazgos) y H8.1-H8.2; el 05 pasa de instrucción a estado (cinco ramas
+implementadas y consumidas, sin interfaz de continuos).
 
-Ficheros principales:
+**Ojo: estos ficheros no viven en el repositorio** (DUDA 45). Se
+entregaron como ficheros del hilo y hay que sustituir los adjuntos del
+agente constructor y del proyecto de diseño. Si lees esto en un hilo
+nuevo y los adjuntos 00/02/05 no llevan el registro de cambios del 4b al
+final, avisa: te pasaron la especificación vieja.
 
-- `web/src/lib/servicio-hoy.ts` — las tres consultas nuevas:
-  `tareasEnCursoDeHoy` (misma forma que la lista de tareas),
-  `notasDeAyer` y `decisionesSobreUmbral` (devuelve null con R6
-  desactivada: la sección desaparece entera). Todo validado en servidor
-  y leyendo el playbook en cada petición, como en los encargos 3 y 4.
-- `web/src/lib/semana.ts` — `instanteInicioDeDia` y `rangoDeAyer`
-  nuevos: el día civil de ayer en Europe/Madrid como rango [inicio, fin)
-  de instantes, con los cambios de hora absorbidos (23 o 25 horas).
-- `web/src/components/sesion-hoy.tsx`, `notas-de-ayer.tsx` y
-  `decisiones-hoy.tsx` — las secciones 2, 3 y 4.
-  `cronometro-sesion.tsx` exporta ahora `useSegundos` para el cronómetro
-  de la tarjeta.
-- `web/src/app/(app)/hoy/page.tsx` — reescrita: cabecera del documento
-  01 (fecha y "Tres cosas hoy" en Instrument Serif) y las cuatro
-  secciones condicionales, con una línea de invitación solo si 1, 3 y 4
-  están vacías a la vez.
-- `web/prisma/seed.ts` — las sesiones admiten `semana: "ayer"`, ancladas
-  al día civil anterior a la siembra: la sección 3 nunca nace vacía, se
-  siembre el día que se siembre. Una sesión nueva de Órbita la usa; el
-  seed pasa de 11 a 12 sesiones.
+### Parte 2 — Alta y edición de decisiones
+
+- `web/src/lib/decisiones.ts` — `validarDatosDecision`: título
+  obligatorio (máximo 200), opciones una por línea con recorte, descarte
+  de vacías y deduplicación exacta, al menos dos (R6 literal: con una no
+  hay decisión), quién bloquea opcional (vacío queda nulo).
+- `web/src/lib/servicio-proyectos.ts` — `crearDecision` (nace abierta,
+  `abierta_desde` en la creación; archivado la rechaza, pausado la
+  admite) y `actualizarDecision` (solo abiertas: las cerradas son
+  registro histórico; edita título, opciones y bloqueado_por en
+  transacción). Validación siempre en servidor.
+- `web/src/app/(app)/proyectos/acciones.ts` — `crearDecisionAction` y
+  `editarDecisionAction` con eco de valores al fallar (DUDA 32) y avisos
+  `?decision=creada|editada` que la página del proyecto pinta.
+- `web/src/components/decisiones-abiertas.tsx` — botón Nueva decisión
+  con formulario en la propia sección (también con la lista vacía) y
+  Editar en cada fila, junto a Cerrar decisión. Campos compartidos entre
+  alta y edición.
+- Efecto buscado: editar las opciones de una abierta permite añadir la
+  ganadora antes de cerrar, mitigando el límite de la DUDA 16 sin campo
+  libre (test del flujo completo).
+
+### Parte 3 — Rechazos por límite de WIP persistidos
+
+- **Primera migración desde el encargo 2**:
+  `web/prisma/migrations/20260826084125_wip_rejections` crea
+  `wip_rejections` (id, user_id, task_id con cascada, limite, created_at).
+- `web/src/lib/servicio-tareas.ts` — el rechazo de `cambiarEstadoTarea`
+  crea el registro dentro de la misma transacción, con el límite vigente
+  de R1. Devolver sin lanzar no revierte: el registro persiste aunque la
+  transición no ocurra. Con R1 desactivada no hay validación, ni rechazo,
+  ni registro (DUDA 44). `rechazosDeWip(db, rango?)` es la consulta para
+  el encargo 5: el numerador de la métrica de R1; el denominador sale de
+  los TaskEvent hacia en_curso.
+- `web/prisma/seed.ts` — tres rechazos plausibles (dos de la semana
+  pasada, uno de esta) sobre tareas de semana, con límite 3. El resumen
+  del seed imprime `rechazos_wip`.
+
+### Tests y verificación
+
+- Unitarios: `validarDatosDecision` (5 casos en
+  `src/lib/decisiones.test.ts`).
+- Integración: alta y edición en `web/tests/decisiones.test.ts` (alta
+  limpia, rechazos de servidor, archivado frente a pausado, flujo de la
+  opción ganadora añadida, cerrada intocable) y rechazos de WIP en
+  `web/tests/tareas.test.ts` (rechazo registra con límite, insistir
+  registra otro, transición válida no registra, consulta por rango, R1
+  apagada no registra). Van en esos ficheros a propósito: vitest corre
+  los ficheros en paralelo y así lo que toca R1 o decisiones queda
+  serializado con sus vecinos.
+- `npm test`: 148/148 (12 nuevos). `tsc --noEmit` limpio.
+- `comprobar-rutas.mjs`: 38 comprobaciones (nueva: el detalle de proyecto
+  muestra Nueva decisión y Editar).
+- `verificar-visual.mjs`: además de todo lo anterior, abre el alta y la
+  edición de decisión en ambos tamaños, sin desbordamiento y con consola
+  limpia.
 
 ## Qué decidí
 
-Las decisiones nuevas están en DUDAS.md 37 a 41; la DUDA 31 queda
-actualizada con el avance parcial. Las que condicionan encargos:
-
-- **Sección 1 literal**: las en_curso a secas, sin completar hasta tres
-  con las de semana de mayor prioridad. Esa lógica de "las tres cosas de
-  hoy", los hallazgos, los resultados comprometidos, los avisos y los
-  anillos de la cabecera son del encargo 7 (DUDAS 37 y 41).
-- **H1.3 aplicada al brief diario entero** (DUDA 38): proyectos en pausa
-  o archivados fuera de las tres consultas; tareas sin proyecto, dentro.
-- **Ayer es el día civil de Madrid con corte exclusivo en la medianoche
-  de hoy** (DUDA 39), y solo cuentan las sesiones con nota escrita.
-- **R6 desactivada elimina la sección de decisiones; el umbral es
-  estricto** ("más de 21" excluye la de exactamente 21) y se lee de
-  `parametros.dias_umbral` en cada petición (DUDA 40). Reutiliza
-  `umbralDiasR6` del encargo 3: una sola fuente para el umbral.
-- **Ninguna migración**: todo cabía en el esquema existente.
+DUDAS 42 a 45 nuevas; la 15 queda resuelta en parte y la 16 mitigada.
+Resumen: solo se editan abiertas (42); el alta exige dos opciones y
+deduplica exacto (43); los rechazos se registran solo cuando R1 valida,
+con el límite vigente, y producción acumula los suyos desde cero (44);
+la especificación sincronizada vive en el conocimiento del agente, no en
+el repositorio (45).
 
 ## Qué quedó fuera
 
-- Hallazgos del radar y resultados comprometidos: lo pide el encargo (no
-  existen todavía como contenido del brief diario).
-- Las secciones 1, 5 y 6 de H7.1 completas: tres cosas de hoy con
-  prioridad, resultados con avance, avisos (ritual pendiente, bloqueadas
-  de más de 3 días, umbral de coste, propuesta de playbook).
-- Anillos orbitales en la cabecera del brief diario (documento 01): van
-  con la pantalla completa (DUDA 41).
-- Los rituales y las métricas de adherencia (encargo 5 del documento 03,
-  intacto).
+- Vista de decisiones cerradas y estado `caducada` (DUDA 15, sigue).
+- Alta o cierre de decisiones desde la pantalla Hoy: el cierre sigue solo
+  en el detalle del proyecto.
+- La métrica de adherencia de R1 y su interfaz: este encargo deja el
+  origen de datos; la métrica es del encargo 5.
+- Edición de `abierta_desde` y del estado de una decisión.
+- Cualquier historia nueva en la especificación: la parte 1 solo alinea.
 
 ## Qué falta verificar a mano
 
-- **La pantalla Hoy en producción con tus datos.** Producción no se
-  resiembra (DUDA 36): la sección de notas solo saldrá si ayer cerraste
-  una sesión con nota ahí, y la de en curso solo con tareas en curso
-  tuyas. Las 17 decisiones del seed del encargo 2 sí están en producción,
-  así que la sección de decisiones bloqueadas debería verse con la lista
-  de a quién perseguir. Comprueba de paso que las secciones sin datos no
-  dejan hueco: se omiten enteras.
-- **El flujo de sesión desde Hoy en producción**: empezar desde la
-  sección 2, ver el cronómetro en la tarjeta y en el lateral a la vez,
-  recargar, cerrar desde la tarjeta. En móvil, la tarjeta convive con la
-  barra superior.
-- **El enlace de cada decisión** lleva al detalle de su proyecto, donde
-  se cierra. Si prefieres cerrar decisiones desde Hoy sin saltar, es una
-  historia nueva.
+- **Sustituir los adjuntos 00, 02 y 05** del agente constructor (y del
+  proyecto de diseño) por los ficheros entregados en el hilo. Hasta
+  entonces, los agentes leerán la especificación desincronizada.
+- **El alta y la edición en producción con tu sesión**: crear una
+  decisión con dos opciones y quién la bloquea, editarla para añadir una
+  tercera, cerrarla eligiendo la añadida. El aviso debe decir "Decisión
+  registrada" y "Decisión editada".
+- **La migración en producción**: el despliegue ejecuta
+  `prisma migrate deploy` en el preDeployCommand; comprueba en el panel
+  que el deploy pasó el health check. La tabla `wip_rejections` empieza
+  vacía en producción (el seed no se relanza): fuerza un rechazo real
+  (con 3 en curso, intenta una cuarta) si quieres ver el primer registro.
 
 ## Verificación criterio a criterio
 
-El encargo suelto no tiene historia propia en el documento 02; la tabla
-recoge sus criterios literales más la definición de terminado.
-
 | Criterio | Cumple | Nota |
 |---|---|---|
-| Cuatro secciones en el orden pedido | Sí | Orden comprobado por rutas con los aria-label de las secciones |
-| Tareas en curso con las bloqueadas marcadas | Sí | Fila del encargo 4; motivo en ámbar; test de integración |
-| Se excluyen tareas de proyectos en pausa (H1.3) | Sí | Test; las sin proyecto entran |
-| Sesión activa o botón de empezar | Sí | Cronómetro desde startedAt; verificado con Playwright: empezar, recargar, cerrar |
-| Notas de cierre de ayer en día civil Europe/Madrid | Sí | rangoDeAyer con tests de borde: medianoche exclusiva y cambios de hora de marzo y octubre |
-| Solo sesiones con nota; abandonadas anotadas marcadas | Sí | Test de integración |
-| Decisiones por encima del umbral de R6 con quién bloquea | Sí | Umbral estricto; ordenadas por días; bloqueado_por visible |
-| R6 desactivada elimina la sección; umbral de parametros | Sí | Tests con la regla apagada y con dias_umbral en 25 |
-| Secciones vacías omitidas por completo | Sí | Render condicional; tests de exclusión por sección |
-| Hallazgos y resultados comprometidos omitidos | Sí | No aparecen en la pantalla |
-| Documento 01: tokens, tipografía, voz | Sí | Cabecera serif, datos en mono con tabular-nums, coral solo en acción y sesión viva |
-| Test del criterio principal | Sí | 136/136 (14 nuevos: 6 unitarios de semana y 8 de integración de Hoy) |
-| Sin errores en consola | Sí | Playwright en todas las rutas y en el flujo de sesión desde Hoy |
-| Correcto a 375px | Sí | Sin desbordamiento; capturas en dos tamaños |
-| Español de España, sin exclamaciones ni emojis | Sí | Interfaz y seed |
-| Datos de ejemplo en el seed | Sí | 12 sesiones (una anclada a ayer), 3 en curso con una bloqueada, 17 decisiones |
+| 00, 02 y 05 alineados con DUDAS 1-41 sin cambiar alcance | Sí | Sin historias nuevas; registro de cambios al final de cada fichero |
+| Cada documento indica qué cambió y por qué | Sí | Sección "Registro de cambios" con la DUDA que motiva cada edición |
+| Alta de decisión con título, opciones y quién bloquea | Sí | Formulario en la sección de decisiones; validación en servidor |
+| Edición de decisiones existentes | Sí | Solo abiertas (DUDA 42); test de que una cerrada no se toca |
+| Al menos dos opciones consideradas (R6) | Sí | Unitario e integración; deduplicación exacta |
+| Rechazos de WIP persistidos como registros | Sí | En la transacción del rechazo, con el límite vigente |
+| Origen de datos listo para la métrica de R1 del encargo 5 | Sí | rechazosDeWip por rango + TaskEvent como denominador |
+| R1 desactivada no registra intentos | Sí | Test con la regla apagada |
+| Migración versionada, sin cambios de esquema fuera de migración | Sí | 20260826084125_wip_rejections |
+| Test del criterio principal | Sí | 148/148 (12 nuevos) |
+| Sin errores en consola | Sí | Playwright, incluidos los formularios nuevos |
+| Correcto a 375px | Sí | Alta y edición verificados en ambos tamaños |
+| Español de España, sin exclamaciones ni emojis | Sí | Interfaz, mensajes y documentos |
+| Datos de ejemplo en el seed | Sí | 3 rechazos de WIP; las 17 decisiones ya estaban |

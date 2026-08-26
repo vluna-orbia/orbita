@@ -13,6 +13,7 @@ import {
   desbloquearTarea,
   limiteWip,
   listaDeTareas,
+  rechazosDeWip,
   tareasEnCursoQueCuentan,
 } from "../src/lib/servicio-tareas";
 
@@ -223,5 +224,60 @@ describe("vista filtrable (H2.6)", () => {
     // Sin filtro de estado, las terminadas no aparecen.
     const abiertas = await listaDeTareas(db, {});
     expect(abiertas.some((t) => t.estado === "hecha" || t.estado === "descartada")).toBe(false);
+  });
+});
+
+// ---------- Rechazos por límite de WIP persistidos (encargo 4b) ----------
+
+describe("los rechazos por límite de WIP quedan registrados (encargo 4b)", () => {
+  it("cada rechazo crea un registro con el límite vigente; las transiciones válidas no", async () => {
+    // El seed deja 2 en curso que cuentan: la tercera propia llena el cupo.
+    const tercera = await capturar("Tercera que llena el cupo");
+    await mover(tercera, "semana");
+    const ok = await mover(tercera, "en_curso");
+    expect(ok.ok).toBe(true);
+    expect(await db.wipRejection.count({ where: { task_id: tercera } })).toBe(0);
+
+    const cuarta = await capturar("Cuarta que rebota");
+    await mover(cuarta, "semana");
+    const rechazo = await mover(cuarta, "en_curso");
+    expect(rechazo.ok).toBe(false);
+    const registros = await db.wipRejection.findMany({ where: { task_id: cuarta } });
+    expect(registros).toHaveLength(1);
+    expect(registros[0].limite).toBe(3);
+
+    // Insistir deja otro registro: cada intento cuenta para la métrica.
+    await mover(cuarta, "en_curso");
+    expect(await db.wipRejection.count({ where: { task_id: cuarta } })).toBe(2);
+
+    // La consulta por rango encuentra los intentos y trae el título.
+    const ahora = new Date();
+    const enRango = await rechazosDeWip(db, {
+      desde: new Date(ahora.getTime() - 3_600_000),
+      hasta: new Date(ahora.getTime() + 60_000),
+    });
+    const propios = enRango.filter((r) => r.tareaId === cuarta);
+    expect(propios).toHaveLength(2);
+    expect(propios[0].tareaTitulo).toBe("Cuarta que rebota");
+    const fuera = await rechazosDeWip(db, {
+      desde: new Date(ahora.getTime() - 2 * 3_600_000),
+      hasta: new Date(ahora.getTime() - 3_600_000),
+    });
+    expect(fuera.filter((r) => r.tareaId === cuarta)).toHaveLength(0);
+  });
+
+  it("con R1 desactivada no hay rechazo y no se registra nada", async () => {
+    const regla = await db.playbookRule.findFirstOrThrow({ where: { clave: "R1" } });
+    await db.playbookRule.update({ where: { id: regla.id }, data: { activa: false } });
+    try {
+      const antes = await db.wipRejection.count();
+      const libre = await capturar("Sin límite no hay registro");
+      await mover(libre, "semana");
+      const r = await mover(libre, "en_curso");
+      expect(r.ok).toBe(true);
+      expect(await db.wipRejection.count()).toBe(antes);
+    } finally {
+      await db.playbookRule.update({ where: { id: regla.id }, data: { activa: true } });
+    }
   });
 });

@@ -4,7 +4,12 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaClient } from "@prisma/client";
-import { cerrarDecision, decisionesAbiertas } from "../src/lib/servicio-proyectos";
+import {
+  actualizarDecision,
+  cerrarDecision,
+  crearDecision,
+  decisionesAbiertas,
+} from "../src/lib/servicio-proyectos";
 
 const db = new PrismaClient();
 
@@ -91,5 +96,149 @@ describe("cierre de una decisión", () => {
     if (!resultado.ok) expect(resultado.error).toContain("ya no está abierta");
     const decision = await db.decision.findUnique({ where: { id: decisionId } });
     expect(decision?.opcion_elegida).toBe("Opción A");
+  });
+});
+
+// ---------- Alta y edición desde la interfaz (encargo 4b) ----------
+
+async function proyectoDeUsarYTirar(estado: "activo" | "pausado" | "archivado") {
+  return db.project.create({
+    data: {
+      user_id: "vluna",
+      nombre: `Alta de decisiones ${estado} ${Date.now()}`,
+      slug: `alta-decisiones-${estado}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      objetivo: "Probar el alta y la edición de decisiones.",
+      estado,
+      color_acento: "#8A6A7B",
+      orden: 98,
+      tipo: "entrega",
+    },
+  });
+}
+
+async function borrar(projectId: string) {
+  await db.decision.deleteMany({ where: { project_id: projectId } });
+  await db.project.delete({ where: { id: projectId } });
+}
+
+describe("alta de decisiones (encargo 4b)", () => {
+  it("crea una decisión abierta con sus opciones limpias y quién la bloquea", async () => {
+    const proyecto = await proyectoDeUsarYTirar("activo");
+    try {
+      const antes = new Date();
+      const resultado = await crearDecision(db, proyecto.slug, {
+        titulo: "  Elegir pasarela de pago  ",
+        opciones: "Stripe\n  Stripe \nRedsys\n\n",
+        bloqueadoPor: "  Banco  ",
+      });
+      expect(resultado.ok).toBe(true);
+      const abiertas = await decisionesAbiertas(db, proyecto.id);
+      expect(abiertas).toHaveLength(1);
+      expect(abiertas[0].titulo).toBe("Elegir pasarela de pago");
+      // Recortadas, sin vacías y sin repetidas (gana la primera aparición).
+      expect(abiertas[0].opciones).toEqual(["Stripe", "Redsys"]);
+      expect(abiertas[0].bloqueadoPor).toBe("Banco");
+      const fila = await db.decision.findFirstOrThrow({ where: { project_id: proyecto.id } });
+      expect(fila.estado).toBe("abierta");
+      expect(fila.abierta_desde.getTime()).toBeGreaterThanOrEqual(antes.getTime() - 1000);
+    } finally {
+      await borrar(proyecto.id);
+    }
+  });
+
+  it("rechaza en el servidor el título vacío y la opción única", async () => {
+    const proyecto = await proyectoDeUsarYTirar("activo");
+    try {
+      const sinTitulo = await crearDecision(db, proyecto.slug, {
+        titulo: "   ",
+        opciones: "A\nB",
+      });
+      expect(sinTitulo.ok).toBe(false);
+      const unaOpcion = await crearDecision(db, proyecto.slug, {
+        titulo: "Decisión coja",
+        opciones: "La única opción\n  La única opción \n",
+      });
+      expect(unaOpcion.ok).toBe(false);
+      if (!unaOpcion.ok) expect(unaOpcion.error).toContain("dos opciones");
+      expect(await db.decision.count({ where: { project_id: proyecto.id } })).toBe(0);
+    } finally {
+      await borrar(proyecto.id);
+    }
+  });
+
+  it("un proyecto archivado no admite decisiones nuevas; uno en pausa sí", async () => {
+    const archivado = await proyectoDeUsarYTirar("archivado");
+    const pausado = await proyectoDeUsarYTirar("pausado");
+    try {
+      const rechazo = await crearDecision(db, archivado.slug, {
+        titulo: "No debería entrar",
+        opciones: "A\nB",
+      });
+      expect(rechazo.ok).toBe(false);
+      if (!rechazo.ok) expect(rechazo.error).toContain("archivado");
+      const admitida = await crearDecision(db, pausado.slug, {
+        titulo: "En pausa se registra",
+        opciones: "A\nB",
+      });
+      expect(admitida.ok).toBe(true);
+    } finally {
+      await borrar(archivado.id);
+      await borrar(pausado.id);
+    }
+  });
+});
+
+describe("edición de decisiones abiertas (encargo 4b)", () => {
+  it("edita título, opciones y quién bloquea, y permite cerrar con la opción añadida", async () => {
+    const proyecto = await proyectoDeUsarYTirar("activo");
+    try {
+      await crearDecision(db, proyecto.slug, {
+        titulo: "Dónde alojar el piloto",
+        opciones: "GPU alquilada\nMáquina física",
+        bloqueadoPor: "Coste mensual",
+      });
+      const decision = await db.decision.findFirstOrThrow({ where: { project_id: proyecto.id } });
+
+      // La opción que gana de verdad no estaba entre las consideradas:
+      // cerrar con ella se rechaza (DUDA 16)...
+      const cierreFallido = await cerrarDecision(db, decision.id, "Nube gestionada", "mejor precio");
+      expect(cierreFallido.ok).toBe(false);
+
+      // ...se edita la decisión para añadirla...
+      const edicion = await actualizarDecision(db, decision.id, {
+        titulo: "Dónde alojar el piloto",
+        opciones: "GPU alquilada\nMáquina física\nNube gestionada",
+        bloqueadoPor: "",
+      });
+      expect(edicion.ok).toBe(true);
+      const editada = await db.decision.findUniqueOrThrow({ where: { id: decision.id } });
+      expect(editada.opciones).toEqual(["GPU alquilada", "Máquina física", "Nube gestionada"]);
+      expect(editada.bloqueado_por).toBeNull();
+
+      // ...y ahora el cierre con la opción nueva funciona.
+      const cierre = await cerrarDecision(db, decision.id, "Nube gestionada", "coste y arranque");
+      expect(cierre.ok).toBe(true);
+    } finally {
+      await borrar(proyecto.id);
+    }
+  });
+
+  it("una decisión cerrada no se edita: es registro histórico", async () => {
+    const proyecto = await proyectoDeUsarYTirar("activo");
+    try {
+      await crearDecision(db, proyecto.slug, { titulo: "Ya decidida", opciones: "A\nB" });
+      const decision = await db.decision.findFirstOrThrow({ where: { project_id: proyecto.id } });
+      await cerrarDecision(db, decision.id, "A", "porque sí");
+      const intento = await actualizarDecision(db, decision.id, {
+        titulo: "Reescribir la historia",
+        opciones: "A\nB\nC",
+      });
+      expect(intento.ok).toBe(false);
+      if (!intento.ok) expect(intento.error).toContain("registro histórico");
+      const intacta = await db.decision.findUniqueOrThrow({ where: { id: decision.id } });
+      expect(intacta.titulo).toBe("Ya decidida");
+    } finally {
+      await borrar(proyecto.id);
+    }
   });
 });

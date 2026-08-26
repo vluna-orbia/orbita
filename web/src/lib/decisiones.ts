@@ -54,3 +54,51 @@ export function validarCierre(
   }
   return { ok: true, opcion, motivo: motivoLimpio };
 }
+
+// ---------- Alta y edición (encargo 4b) ----------
+
+export type DatosDecision = {
+  titulo: string;
+  opciones: string[];
+  bloqueadoPor: string | null;
+};
+
+export type ResultadoDatosDecision =
+  | { ok: true; datos: DatosDecision }
+  | { ok: false; error: string };
+
+// Validación del alta y la edición. R6 literal: una decisión tiene más de
+// una opción viable; con una sola no hay decisión que registrar. Las
+// opciones llegan una por línea; se recortan, se descartan las vacías y
+// las repetidas se quedan con la primera aparición.
+export function validarDatosDecision(entrada: {
+  titulo: string;
+  opciones: string;
+  bloqueadoPor?: string;
+}): ResultadoDatosDecision {
+  const titulo = entrada.titulo.trim();
+  if (!titulo) return { ok: false, error: "Escribe el título de la decisión." };
+  if (titulo.length > 200) {
+    return { ok: false, error: "El título no puede pasar de 200 caracteres." };
+  }
+  const opciones = [
+    ...new Set(
+      entrada.opciones
+        .split("\n")
+        .map((o) => o.trim())
+        .filter((o) => o !== "")
+    ),
+  ];
+  if (opciones.length < 2) {
+    return {
+      ok: false,
+      error:
+        "Una decisión necesita al menos dos opciones consideradas. Con una sola no hay decisión que registrar: es la regla R6.",
+    };
+  }
+  const bloqueadoPor = (entrada.bloqueadoPor ?? "").trim();
+  return {
+    ok: true,
+    datos: { titulo, opciones, bloqueadoPor: bloqueadoPor === "" ? null : bloqueadoPor },
+  };
+}

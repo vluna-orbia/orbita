@@ -903,6 +903,7 @@ async function main() {
     prisma.researchIntent.deleteMany(),
     prisma.source.deleteMany(),
     prisma.digestRun.deleteMany(),
+    prisma.wipRejection.deleteMany(),
     prisma.taskEvent.deleteMany(),
     prisma.workSession.deleteMany(),
     prisma.task.deleteMany(),
@@ -1179,6 +1180,30 @@ async function main() {
     });
   }
 
+  // Rechazos por límite de WIP (encargo 4b): origen de datos de la
+  // métrica de adherencia de R1 (H5.3). Dos de la semana pasada y uno de
+  // esta, sobre tareas que estaban en semana cuando se intentó empezarlas.
+  const RECHAZOS_WIP: { tarea: string; semana: "esta" | "pasada"; dia: number; hora: number }[] = [
+    { tarea: "Enviar la factura de agosto a Yajoma", semana: "pasada", dia: 1, hora: 11 },
+    { tarea: "Definir los estados de una spec y sus transiciones", semana: "pasada", dia: 3, hora: 17 },
+    { tarea: "Verificar el encargo 4 en producción", semana: "esta", dia: 0, hora: 10 },
+  ];
+  for (const r of RECHAZOS_WIP) {
+    const base = r.semana === "esta" ? inicioSemana : inicioSemanaPasada;
+    let momento = new Date(base + r.dia * 86_400_000 + r.hora * 3_600_000);
+    if (momento.getTime() > ahora.getTime()) {
+      momento = new Date(ahora.getTime() - 45 * 60_000);
+    }
+    await prisma.wipRejection.create({
+      data: {
+        user_id: USER_ID,
+        task_id: tareasPorTitulo[r.tarea],
+        limite: 3,
+        created_at: momento,
+      },
+    });
+  }
+
   const resumen = {
     proyectos: await prisma.project.count(),
     briefs: await prisma.projectBrief.count(),
@@ -1190,6 +1215,7 @@ async function main() {
     tareas: await prisma.task.count(),
     eventos: await prisma.taskEvent.count(),
     sesiones: await prisma.workSession.count(),
+    rechazos_wip: await prisma.wipRejection.count(),
   };
   console.log("Seed cargado:", JSON.stringify(resumen));
 }

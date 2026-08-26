@@ -8,9 +8,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import {
+  actualizarDecision,
   actualizarProyecto,
   cambiarEstadoProyecto,
   cerrarDecision,
+  crearDecision,
   crearProyecto,
   guardarBrief,
   type EstadoDestino,
@@ -102,4 +104,54 @@ export async function cerrarDecisionAction(
   if (!resultado.ok) return { error: resultado.error };
   revalidatePath(`/proyectos/${slug}`);
   redirect(`/proyectos/${slug}?decision=cerrada`);
+}
+
+// ---------- Alta y edición de decisiones (encargo 4b) ----------
+
+// Los formularios de decisión devuelven lo escrito cuando fallan: React
+// resetea el formulario tras cada envío y sin este eco una validación
+// fallida borraría el texto (DUDA 32).
+export type EstadoDecision = {
+  error: string;
+  valores: { titulo: string; opciones: string; bloqueado_por: string };
+} | null;
+
+export async function crearDecisionAction(
+  _estado: EstadoDecision,
+  formData: FormData
+): Promise<EstadoDecision> {
+  const slug = campo(formData, "slug");
+  const valores = {
+    titulo: campo(formData, "titulo"),
+    opciones: campo(formData, "opciones"),
+    bloqueado_por: campo(formData, "bloqueado_por"),
+  };
+  const resultado = await crearDecision(prisma, slug, {
+    titulo: valores.titulo,
+    opciones: valores.opciones,
+    bloqueadoPor: valores.bloqueado_por,
+  });
+  if (!resultado.ok) return { error: resultado.error, valores };
+  revalidatePath(`/proyectos/${slug}`);
+  redirect(`/proyectos/${slug}?decision=creada`);
+}
+
+export async function editarDecisionAction(
+  _estado: EstadoDecision,
+  formData: FormData
+): Promise<EstadoDecision> {
+  const slug = campo(formData, "slug");
+  const valores = {
+    titulo: campo(formData, "titulo"),
+    opciones: campo(formData, "opciones"),
+    bloqueado_por: campo(formData, "bloqueado_por"),
+  };
+  const resultado = await actualizarDecision(prisma, campo(formData, "decision_id"), {
+    titulo: valores.titulo,
+    opciones: valores.opciones,
+    bloqueadoPor: valores.bloqueado_por,
+  });
+  if (!resultado.ok) return { error: resultado.error, valores };
+  revalidatePath(`/proyectos/${slug}`);
+  redirect(`/proyectos/${slug}?decision=editada`);
 }

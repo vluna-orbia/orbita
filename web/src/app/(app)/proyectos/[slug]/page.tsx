@@ -152,6 +152,12 @@ export default async function DetalleProyecto({
         {avisoDecision === "cerrada" ? (
           <AvisoBanner tono="neutro">Decisión cerrada, con su opción y su motivo registrados.</AvisoBanner>
         ) : null}
+        {avisoDecision === "creada" ? (
+          <AvisoBanner tono="neutro">Decisión registrada. Queda abierta desde hoy.</AvisoBanner>
+        ) : null}
+        {avisoDecision === "editada" ? (
+          <AvisoBanner tono="neutro">Decisión editada.</AvisoBanner>
+        ) : null}
       </div>
 
       <p className="mt-6 max-w-[68ch] text-[1.0625rem] leading-[1.65] text-tinta-media">

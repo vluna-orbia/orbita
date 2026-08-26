@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { diasAbierta, opcionesComoLista, validarCierre } from "./decisiones";
+import { diasAbierta, opcionesComoLista, validarCierre, validarDatosDecision } from "./decisiones";
 
 const ahora = new Date("2026-08-25T12:00:00+02:00");
 
@@ -68,5 +68,46 @@ describe("validarCierre", () => {
 
   it("rechaza el cierre sin opción", () => {
     expect(validarCierre(opciones, "", "motivo").ok).toBe(false);
+  });
+});
+
+describe("validarDatosDecision (encargo 4b)", () => {
+  it("recorta el título y exige que exista", () => {
+    const vacio = validarDatosDecision({ titulo: "   ", opciones: "A\nB" });
+    expect(vacio.ok).toBe(false);
+    const valido = validarDatosDecision({ titulo: "  Elegir dominio  ", opciones: "A\nB" });
+    expect(valido.ok).toBe(true);
+    if (valido.ok) expect(valido.datos.titulo).toBe("Elegir dominio");
+  });
+
+  it("rechaza títulos de más de 200 caracteres", () => {
+    const largo = validarDatosDecision({ titulo: "x".repeat(201), opciones: "A\nB" });
+    expect(largo.ok).toBe(false);
+  });
+
+  it("limpia las opciones: recorta, quita vacías y deduplica conservando el orden", () => {
+    const resultado = validarDatosDecision({
+      titulo: "Opciones sucias",
+      opciones: "  cribo.es \n\ncribo.app\ncribo.es\n   \n",
+    });
+    expect(resultado.ok).toBe(true);
+    if (resultado.ok) expect(resultado.datos.opciones).toEqual(["cribo.es", "cribo.app"]);
+  });
+
+  it("con menos de dos opciones no hay decisión (R6)", () => {
+    const una = validarDatosDecision({ titulo: "Coja", opciones: "única\n única " });
+    expect(una.ok).toBe(false);
+    if (!una.ok) expect(una.error).toContain("dos opciones");
+    const ninguna = validarDatosDecision({ titulo: "Vacía", opciones: "\n\n" });
+    expect(ninguna.ok).toBe(false);
+  });
+
+  it("quién bloquea es opcional y el vacío queda como nulo", () => {
+    const sin = validarDatosDecision({ titulo: "Libre", opciones: "A\nB", bloqueadoPor: "   " });
+    expect(sin.ok).toBe(true);
+    if (sin.ok) expect(sin.datos.bloqueadoPor).toBeNull();
+    const con = validarDatosDecision({ titulo: "Bloqueada", opciones: "A\nB", bloqueadoPor: " Solvos " });
+    expect(con.ok).toBe(true);
+    if (con.ok) expect(con.datos.bloqueadoPor).toBe("Solvos");
   });
 });

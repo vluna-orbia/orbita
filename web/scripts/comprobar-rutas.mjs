@@ -31,7 +31,7 @@ const RUTAS = [
 // Rutas del encargo 3: detalle de proyecto, brief y decisiones.
 const RUTAS_ENCARGO_3 = [
   ["/proyectos/nuevo", ["Nuevo proyecto", "Objetivo", "Crear proyecto"]],
-  ["/proyectos/yajoma", ["Brief vivo", "Decisiones abiertas", "Departamento por defecto de BOLLERIA"]],
+  ["/proyectos/yajoma", ["Brief vivo", "Decisiones abiertas", "Departamento por defecto de BOLLERIA", "Nueva decisión", "Editar"]],
   ["/proyectos/yajoma/brief", ["Brief vivo", "Guardar versión"]],
   ["/proyectos/yajoma/versiones", ["Versiones del brief", "Comparar", "Versión 1"]],
   ["/proyectos/yajoma/editar", ["Editar proyecto", "Guardar cambios"]],

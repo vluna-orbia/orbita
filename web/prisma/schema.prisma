@@ -146,11 +146,12 @@ model Task {
   created_at     DateTime   @default(now())
   updated_at     DateTime   @updatedAt
 
-  project    Project?    @relation(fields: [project_id], references: [id], onDelete: SetNull)
-  bloqueante Task?       @relation("TareaBloqueante", fields: [bloqueada_por], references: [id], onDelete: SetNull)
-  bloqueadas Task[]      @relation("TareaBloqueante")
-  events     TaskEvent[]
-  findings   Finding[]
+  project      Project?       @relation(fields: [project_id], references: [id], onDelete: SetNull)
+  bloqueante   Task?          @relation("TareaBloqueante", fields: [bloqueada_por], references: [id], onDelete: SetNull)
+  bloqueadas   Task[]         @relation("TareaBloqueante")
+  events       TaskEvent[]
+  rechazos_wip WipRejection[]
+  findings     Finding[]
 
   @@map("tasks")
 }
@@ -168,6 +169,24 @@ model TaskEvent {
   task Task @relation(fields: [task_id], references: [id], onDelete: Cascade)
 
   @@map("task_events")
+}
+
+// Rechazos por límite de WIP (encargo 4b). Cada intento de poner una
+// tarea en curso rechazado por R1 deja un registro: es el numerador de
+// la métrica de adherencia de R1 (H5.3, intentos sobre transiciones a
+// en_curso). Con R1 desactivada no hay validación, ni rechazo, ni
+// registro. Se escribe dentro de la misma transacción del rechazo.
+model WipRejection {
+  id         String   @id @default(cuid())
+  user_id    String
+  task_id    String
+  // Límite vigente en el momento del rechazo (parametros.limite de R1).
+  limite     Int
+  created_at DateTime @default(now())
+
+  task Task @relation(fields: [task_id], references: [id], onDelete: Cascade)
+
+  @@map("wip_rejections")
 }
 
 model WorkSession {

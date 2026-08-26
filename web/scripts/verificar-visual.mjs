@@ -80,6 +80,22 @@ async function recorrer(nombre, viewport) {
   }
   await pagina.screenshot({ path: `${DIR}/decision-cierre-${nombre}.png`, fullPage: true });
 
+  // Encargo 4b — alta y edición de decisiones en la propia sección.
+  await pagina.goto(BASE + "/proyectos/yajoma", { waitUntil: "networkidle" });
+  await pagina.getByRole("button", { name: "Nueva decisión" }).click();
+  await pagina.getByText("Opciones consideradas, una por línea").waitFor({ timeout: 5000 });
+  const desbordamientoAlta = await pagina.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth
+  );
+  if (desbordamientoAlta) {
+    problemas.push(`[${nombre}] desbordamiento horizontal con el alta de decisión abierta`);
+  }
+  await pagina.screenshot({ path: `${DIR}/decision-alta-${nombre}.png`, fullPage: true });
+  await pagina.getByRole("button", { name: "Cancelar" }).click();
+  await pagina.getByRole("button", { name: "Editar" }).first().click();
+  await pagina.getByRole("button", { name: "Guardar cambios" }).waitFor({ timeout: 5000 });
+  await pagina.screenshot({ path: `${DIR}/decision-edicion-${nombre}.png`, fullPage: true });
+
   // Encargo 4 — el detalle de una tarea, llegando por su enlace real.
   await pagina.goto(BASE + "/tareas", { waitUntil: "networkidle" });
   await pagina.locator('a[href^="/tareas/"]').first().click();
